@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { SiteDataProvider } from "@/components/SiteDataProvider";
 import { KitsysArrowField } from "@/components/KitsysArrowField";
+import { GlowDots } from "@/components/GlowDots";
 
 function NotFoundComponent() {
   return (
@@ -84,7 +85,11 @@ function RootComponent() {
     <ThemeProvider>
       <LanguageProvider>
         <SiteDataProvider>
+          {/* Persistent physics backgrounds — global layer that follows the
+              cursor across every page and section. Two stacked canvases:
+              chevrons (point toward cursor) + glow dots (light up under it). */}
           <KitsysArrowField mode="fixed" className="chevron-canvas z-0" />
+          <GlowDots mode="fixed" className="glow-canvas z-0" spacing={42} />
           <Outlet />
           <Toaster position="bottom-right" />
         </SiteDataProvider>
