@@ -1,38 +1,28 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, animate } from "framer-motion";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { MessageSquare, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLang } from "./LanguageProvider";
 import { useSiteData } from "./SiteDataProvider";
 
 /**
- * SwipeToComments — WhatsApp-grade sibling navigation between
+ * SwipeToComments — Native-grade sibling navigation between
  * `/` (home) and `/comments` (chat).
  *
- * Engineering goals (matching native messenger feel):
- *  1. The page tracks the finger 1:1, in real time, with zero render churn —
- *     we use framer-motion's `useMotionValue` so the transform updates on
- *     the compositor without React re-renders.
- *  2. Direction lock is strict: vertical scroll always wins until horizontal
- *     dominance is unambiguous (12px and >1.4× vertical).
- *  3. Release physics: distance OR velocity commits navigation. On release we
- *     animate the page the rest of the way (or back) with a tuned spring
- *     (stiffness 380 / damping 38) — that's the WhatsApp signature feel.
- *  4. We never animate twice — when committed, we hand off the final slide
- *     to <PageTransition> by setting a "skip-incoming-anim" flag for the
- *     other route's first frame. Result: zero double-animation jank.
- *  5. Edge handle / mobile tab remains as discoverable affordance.
- *  6. Keyboard arrows still work (mirrored in RTL).
+ * Performance / feel engineering:
+ *  - Pointer Capture for stable tracking even when finger leaves a child el.
+ *  - rAF-coalesced move handler: at most one DOM/style write per frame.
+ *  - useMotionValue + CSS variables → compositor-only updates, zero React
+ *    re-renders during drag (verified by no setState in the move path).
+ *  - Sliding-window velocity tracker (last 80ms) — matches iOS Page Sheet
+ *    and WhatsApp release physics; avoids the "stuck at threshold" feel.
+ *  - Outgoing page parallax: leaving page moves at 30% of finger travel,
+ *    incoming page tracks 100%. This depth cue is the WhatsApp signature.
+ *  - Spring tuned for natural settle: stiffness 420 / damping 42.
+ *  - Skips re-animating on the destination route via session flag handoff.
  */
 
-export type SwipeProgress = {
-  /** Signed -1..1 where positive means "moving toward the other page". */
-  value: number;
-  /** Direction sign that takes you to the other page (+1 or -1). */
-  desiredSign: number;
-  /** Whether a drag is currently in progress. */
-  active: boolean;
-};
+type Sample = { x: number; t: number };
 
 export function SwipeToComments() {
   const navigate = useNavigate();
@@ -45,58 +35,37 @@ export function SwipeToComments() {
   const onComments = location.pathname === "/comments";
   const otherPath = onComments ? "/" : "/comments";
 
-  // Direction sign that takes you to the OTHER page.
-  // LTR + on /  → swipe LEFT  (negative dx)  → /comments  (sign = -1)
-  // LTR + on /comments → swipe RIGHT (positive dx) → /     (sign = +1)
+  // Sign that takes you to the OTHER page (commit direction).
   const desiredSign = (() => {
     if (!onComments) return isRtl ? +1 : -1;
     return isRtl ? -1 : +1;
   })();
 
-  // The signed translation in px applied to the current page during drag.
-  // Positive sign always means "moving in the commit direction".
-  const drag = useMotionValue(0);
+  // The signed projected travel in commit direction (px, ≥ 0 normally).
+  // We expose it as a motion value for compositor-only updates.
+  const travel = useMotionValue(0);
   const widthRef = useRef(typeof window !== "undefined" ? window.innerWidth : 1);
-
-  // Visual transforms derived from drag — no React re-renders.
-  // The current page slides off-screen as the user drags toward commit.
-  const pageX = useTransform(drag, (v) => `${v}px`);
-  // The "next page preview" slides in from the opposite edge.
-  const previewX = useTransform(drag, (v) => {
-    const w = widthRef.current || 1;
-    // Start fully off-screen on the opposite side, slide to 0.
-    const off = -desiredSign * w;
-    return `${off + v}px`;
-  });
-  // Subtle dimming of the leaving page for depth.
-  const pageOpacity = useTransform(drag, (v) => {
-    const w = widthRef.current || 1;
-    const ratio = Math.min(1, Math.abs(v) / w);
-    return 1 - ratio * 0.25;
-  });
 
   const [dragging, setDragging] = useState(false);
 
-  // Pointer state.
+  // Pointer / gesture state
   const startX = useRef(0);
   const startY = useRef(0);
-  const startT = useRef(0);
-  const lastX = useRef(0);
-  const lastT = useRef(0);
+  const samples = useRef<Sample[]>([]);
   const active = useRef(false);
   const locked = useRef<"h" | "v" | null>(null);
+  const pointerId = useRef<number | null>(null);
+  const rafPending = useRef<number | null>(null);
+  const lastEventX = useRef(0);
 
-  // Reset drag whenever the route actually changes (after commit/cancel).
+  // Reset whenever route actually changes.
   useEffect(() => {
-    drag.set(0);
+    travel.set(0);
     setDragging(false);
-  }, [location.pathname, drag]);
+  }, [location.pathname, travel]);
 
-  // Track viewport size changes.
   useEffect(() => {
-    const onResize = () => {
-      widthRef.current = window.innerWidth;
-    };
+    const onResize = () => { widthRef.current = window.innerWidth; };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -107,77 +76,149 @@ export function SwipeToComments() {
     while (node && node !== document.body) {
       if (node.hasAttribute("data-no-swipe")) return true;
       const tag = node.tagName.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select" || tag === "canvas") {
-        return true;
-      }
+      if (tag === "input" || tag === "textarea" || tag === "select" || tag === "canvas") return true;
       if ((node as HTMLElement).isContentEditable) return true;
-      // Horizontally scrollable container — let it own horizontal gestures.
       const style = window.getComputedStyle(node);
       const overflowX = style.overflowX;
       if (
         (overflowX === "auto" || overflowX === "scroll") &&
         (node as HTMLElement).scrollWidth > (node as HTMLElement).clientWidth + 1
-      ) {
-        return true;
-      }
+      ) return true;
       node = node.parentElement;
     }
     return false;
   }, []);
 
-  // Spring used for both "snap back" and "complete commit". WhatsApp-tuned.
-  const springTo = useCallback(
-    (target: number, onComplete?: () => void) => {
-      const controls = animate(drag, target, {
-        type: "spring",
-        stiffness: 380,
-        damping: 38,
-        mass: 0.9,
-        velocity: 0, // velocity is added by gesture release if needed
-        restDelta: 0.5,
-        onComplete,
-      });
-      return controls;
-    },
-    [drag],
-  );
+  // Velocity in px/ms over a sliding window (last 80ms).
+  const computeVelocity = useCallback((): number => {
+    const now = performance.now();
+    const window_ms = 80;
+    const arr = samples.current;
+    let i = arr.length - 1;
+    while (i > 0 && now - arr[i - 1].t < window_ms) i--;
+    if (arr.length < 2 || i >= arr.length - 1) return 0;
+    const a = arr[i];
+    const b = arr[arr.length - 1];
+    const dt = Math.max(1, b.t - a.t);
+    return (b.x - a.x) / dt; // px/ms (signed in screen coords)
+  }, []);
 
-  // Pointer-driven swipe with motion values (no setState in the hot path).
+  const springTo = useCallback((target: number, onComplete?: () => void, velocity = 0) => {
+    return animate(travel, target, {
+      type: "spring",
+      stiffness: 420,
+      damping: 42,
+      mass: 0.85,
+      velocity,
+      restDelta: 0.4,
+      onComplete,
+    });
+  }, [travel]);
+
+  // Apply transforms via CSS variables on <html>. Compositor-only.
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = (v: number) => {
+      const w = widthRef.current || 1;
+      // Outgoing page: parallax (30%), in screen-x direction.
+      const pageTx = -desiredSign * v * 0.3;
+      // Incoming page: starts off-screen at desiredSign * w (i.e. opposite
+      // side from where it slides toward 0). Tracks finger 1:1.
+      const previewTx = -desiredSign * (w - v);
+      const ratio = Math.min(1, Math.abs(v) / w);
+      root.style.setProperty("--swipe-page-x", `${pageTx}px`);
+      root.style.setProperty("--swipe-preview-x", `${previewTx}px`);
+      root.style.setProperty("--swipe-page-opacity", `${1 - ratio * 0.18}`);
+      root.style.setProperty("--swipe-preview-shadow", `${Math.min(0.35, ratio * 0.4)}`);
+    };
+    apply(travel.get());
+    const unsub = travel.on("change", apply);
+    return () => {
+      unsub();
+      root.style.removeProperty("--swipe-page-x");
+      root.style.removeProperty("--swipe-preview-x");
+      root.style.removeProperty("--swipe-page-opacity");
+      root.style.removeProperty("--swipe-preview-shadow");
+    };
+  }, [travel, desiredSign]);
+
   useEffect(() => {
     if (!showComments) return;
 
-    const COMMIT_DIST = 0.28; // 28% of width
-    const FLICK_VEL = 0.6; // px/ms
+    const COMMIT_DIST = 0.3;       // 30% of width
+    const FLICK_VEL = 0.55;        // px/ms (in commit direction)
+    const EDGE_PRIORITY_PX = 28;   // touches that start within 28px of an edge bypass interactive checks
 
     const reset = () => {
       active.current = false;
       locked.current = null;
+      pointerId.current = null;
+      samples.current = [];
+      if (rafPending.current !== null) {
+        cancelAnimationFrame(rafPending.current);
+        rafPending.current = null;
+      }
       setDragging(false);
     };
 
     const onStart = (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (isInteractive(e.target)) return;
+      const w = window.innerWidth;
+      // Edge swipe gets priority — start regardless of underlying interactive.
+      const fromCommitEdge =
+        (desiredSign === -1 && e.clientX > w - EDGE_PRIORITY_PX) ||
+        (desiredSign === +1 && e.clientX < EDGE_PRIORITY_PX);
+      if (!fromCommitEdge && isInteractive(e.target)) return;
+
       startX.current = e.clientX;
       startY.current = e.clientY;
-      lastX.current = e.clientX;
-      lastT.current = performance.now();
-      startT.current = lastT.current;
+      lastEventX.current = e.clientX;
+      samples.current = [{ x: e.clientX, t: performance.now() }];
       active.current = true;
       locked.current = null;
-      widthRef.current = window.innerWidth;
+      pointerId.current = e.pointerId;
+      widthRef.current = w;
+    };
+
+    const flush = () => {
+      rafPending.current = null;
+      if (!active.current || locked.current !== "h") return;
+      const dx = lastEventX.current - startX.current;
+      const projected = dx * desiredSign;
+      let next: number;
+      if (projected >= 0) {
+        next = projected;
+      } else {
+        // Rubber-band on wrong-way pull.
+        next = -Math.tanh(-projected / 220) * 70;
+      }
+      travel.set(next);
     };
 
     const onMove = (e: PointerEvent) => {
       if (!active.current) return;
+      if (pointerId.current !== null && e.pointerId !== pointerId.current) return;
+
       const dx = e.clientX - startX.current;
       const dy = e.clientY - startY.current;
 
       if (locked.current === null) {
-        if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
-        if (Math.abs(dx) > Math.abs(dy) * 1.4) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        // Edge-start gestures are eager-horizontal (lower bar).
+        const w = widthRef.current || window.innerWidth;
+        const edgeStart =
+          (desiredSign === -1 && startX.current > w - 28) ||
+          (desiredSign === +1 && startX.current < 28);
+        const horizontalWins = edgeStart
+          ? Math.abs(dx) > Math.abs(dy) * 0.9
+          : Math.abs(dx) > Math.abs(dy) * 1.4;
+        if (horizontalWins) {
           locked.current = "h";
           setDragging(true);
+          // Capture so we keep getting events even if pointer crosses other els.
+          try {
+            (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+          } catch { /* no-op */ }
         } else {
           locked.current = "v";
           active.current = false;
@@ -185,20 +226,19 @@ export function SwipeToComments() {
         }
       }
 
-      // Project onto desired direction; mild rubber-band on the wrong way.
-      const projected = dx * desiredSign;
-      let translate: number;
-      if (projected >= 0) {
-        translate = -desiredSign * projected; // page slides off-screen
-      } else {
-        // Wrong-way pull: rubber band, capped.
-        const resist = Math.tanh(-projected / 200) * 60;
-        translate = desiredSign * resist;
+      // Sample for velocity tracker (signed in screen coords).
+      const now = performance.now();
+      samples.current.push({ x: e.clientX, t: now });
+      // Keep last ~150ms.
+      while (samples.current.length > 2 && now - samples.current[0].t > 150) {
+        samples.current.shift();
       }
-      drag.set(translate);
 
-      lastX.current = e.clientX;
-      lastT.current = performance.now();
+      lastEventX.current = e.clientX;
+      // Coalesce DOM writes to one per frame.
+      if (rafPending.current === null) {
+        rafPending.current = requestAnimationFrame(flush);
+      }
     };
 
     const finish = (e?: PointerEvent) => {
@@ -206,36 +246,40 @@ export function SwipeToComments() {
         reset();
         return;
       }
-      const x = e ? e.clientX : lastX.current;
+      // Ensure the last move is applied before measuring.
+      if (rafPending.current !== null) {
+        cancelAnimationFrame(rafPending.current);
+        rafPending.current = null;
+        flush();
+      }
+
+      const x = e ? e.clientX : lastEventX.current;
       const dx = x - startX.current;
       const projected = dx * desiredSign;
       const w = widthRef.current || window.innerWidth;
 
-      // Velocity from the last few ms of movement.
-      const dt = Math.max(1, performance.now() - startT.current);
-      const vel = (projected / dt); // px/ms in commit direction
+      // Velocity in commit direction (px/ms).
+      const rawVel = computeVelocity();
+      const commitVel = rawVel * desiredSign;
+
+      // Predicted final position with momentum (helps snappy flicks).
+      const predicted = projected + commitVel * 90;
 
       const commit =
-        projected >= w * COMMIT_DIST || (vel >= FLICK_VEL && projected > 30);
+        projected >= w * COMMIT_DIST ||
+        (commitVel >= FLICK_VEL && projected > 24) ||
+        predicted >= w * COMMIT_DIST;
+
+      const handoffVelocity = Math.abs(commitVel); // spring takes |velocity|
 
       reset();
 
       if (commit) {
-        // Slide the rest of the way out, then navigate. The new route's
-        // PageTransition will start at offset 0 (already in place visually).
-        const target = -desiredSign * w;
-        // Mark so PageTransition skips the incoming animation once.
-        try {
-          sessionStorage.setItem("swipe-skip-incoming", "1");
-        } catch {
-          /* no-op */
-        }
-        springTo(target, () => {
-          navigate({ to: otherPath });
-        });
+        try { sessionStorage.setItem("swipe-skip-incoming", "1"); } catch { /* no-op */ }
+        // Animate travel to full width, then navigate at the visual peak.
+        springTo(w, () => navigate({ to: otherPath }), handoffVelocity);
       } else {
-        // Snap back to origin.
-        springTo(0);
+        springTo(0, undefined, -handoffVelocity);
       }
     };
 
@@ -249,7 +293,7 @@ export function SwipeToComments() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
     };
-  }, [desiredSign, drag, isInteractive, navigate, otherPath, showComments, springTo]);
+  }, [computeVelocity, desiredSign, isInteractive, navigate, otherPath, showComments, springTo, travel]);
 
   // Keyboard arrows (mirrored in RTL).
   useEffect(() => {
@@ -264,37 +308,13 @@ export function SwipeToComments() {
         : (isRtl ? e.key === "ArrowRight" : e.key === "ArrowLeft");
       if (wantsOther) {
         e.preventDefault();
-        try {
-          sessionStorage.setItem("swipe-skip-incoming", "1");
-        } catch {
-          /* no-op */
-        }
+        try { sessionStorage.setItem("swipe-skip-incoming", "1"); } catch { /* no-op */ }
         navigate({ to: otherPath });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isRtl, navigate, onComments, otherPath, showComments]);
-
-  // Apply live transform to the page wrapper rendered by PageTransition.
-  // We do this by writing CSS variables on <html> so the wrapper can react.
-  useEffect(() => {
-    const root = document.documentElement;
-    const unsub = drag.on("change", (v) => {
-      root.style.setProperty("--swipe-x", `${v}px`);
-      const w = widthRef.current || 1;
-      const off = -desiredSign * w;
-      root.style.setProperty("--swipe-preview-x", `${off + v}px`);
-      const ratio = Math.min(1, Math.abs(v) / w);
-      root.style.setProperty("--swipe-page-opacity", `${1 - ratio * 0.25}`);
-    });
-    return () => {
-      unsub();
-      root.style.removeProperty("--swipe-x");
-      root.style.removeProperty("--swipe-preview-x");
-      root.style.removeProperty("--swipe-page-opacity");
-    };
-  }, [drag, desiredSign]);
 
   if (!showComments) return null;
 
@@ -304,16 +324,18 @@ export function SwipeToComments() {
   const handleLabel = !onComments ? t("Comments", "التعليقات") : t("Portfolio", "البروفايل");
   const handleIcon = !onComments ? <MessageSquare className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />;
 
+  const navOther = () => {
+    try { sessionStorage.setItem("swipe-skip-incoming", "1"); } catch { /* no-op */ }
+    navigate({ to: otherPath });
+  };
+
   return (
     <>
-      {/* Desktop edge pill — discoverable affordance */}
+      {/* Desktop pill */}
       <motion.button
         type="button"
         aria-label={handleLabel}
-        onClick={() => {
-          try { sessionStorage.setItem("swipe-skip-incoming", "1"); } catch { /* no-op */ }
-          navigate({ to: otherPath });
-        }}
+        onClick={navOther}
         initial={{ opacity: 0, x: handleOnRight ? 16 : -16 }}
         animate={{ opacity: dragging ? 0 : 1, x: 0 }}
         transition={{ opacity: { duration: 0.4, delay: 0.5 } }}
@@ -322,9 +344,7 @@ export function SwipeToComments() {
       >
         {handleOnRight ? (
           <>
-            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">
-              {handleIcon}
-            </span>
+            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">{handleIcon}</span>
             <span className="text-[11px] font-medium uppercase tracking-[0.18em]">{handleLabel}</span>
             <Arrow className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:-translate-x-0.5" />
           </>
@@ -332,21 +352,16 @@ export function SwipeToComments() {
           <>
             <Arrow className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:translate-x-0.5" />
             <span className="text-[11px] font-medium uppercase tracking-[0.18em]">{handleLabel}</span>
-            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">
-              {handleIcon}
-            </span>
+            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">{handleIcon}</span>
           </>
         )}
       </motion.button>
 
-      {/* Mobile thin edge tab */}
+      {/* Mobile thin tab */}
       <motion.button
         type="button"
         aria-label={handleLabel}
-        onClick={() => {
-          try { sessionStorage.setItem("swipe-skip-incoming", "1"); } catch { /* no-op */ }
-          navigate({ to: otherPath });
-        }}
+        onClick={navOther}
         initial={{ opacity: 0 }}
         animate={{ opacity: dragging ? 0 : 0.85 }}
         transition={{ duration: 0.4, delay: 0.5 }}
@@ -354,8 +369,7 @@ export function SwipeToComments() {
         className={`fixed top-1/2 -translate-y-1/2 ${edgeClass} z-40 md:hidden h-16 w-1.5 ${handleOnRight ? "rounded-l-full" : "rounded-r-full"} bg-primary/70`}
       />
 
-      {/* Live preview surface that follows the finger. Rendered as a fixed
-          overlay so we don't need to mount the whole other route. */}
+      {/* Live preview surface. Pure CSS-var driven, no React updates per frame. */}
       <AnimatePresence>
         {dragging && (
           <motion.div
@@ -363,9 +377,8 @@ export function SwipeToComments() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            style={{ x: previewX }}
-            className="fixed inset-0 z-[55] pointer-events-none bg-background"
+            transition={{ duration: 0.1 }}
+            className="fixed inset-0 z-[55] pointer-events-none bg-background swipe-preview-layer"
             aria-hidden
           >
             <div className="absolute inset-0 flex items-center justify-center">
@@ -379,31 +392,24 @@ export function SwipeToComments() {
                 </span>
               </div>
             </div>
-            {/* Soft shadow on the trailing edge for depth */}
-            <div
-              className={`pointer-events-none absolute top-0 bottom-0 w-8 ${handleOnRight ? "right-full" : "left-full"}`}
-              style={{
-                background: handleOnRight
-                  ? "linear-gradient(to left, color-mix(in oklab, black 18%, transparent), transparent)"
-                  : "linear-gradient(to right, color-mix(in oklab, black 18%, transparent), transparent)",
-              }}
-            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Live transform applied to the current page wrapper via CSS var. */}
       <style>{`
         [data-page-wrapper] {
-          transform: translate3d(var(--swipe-x, 0px), 0, 0);
+          transform: translate3d(var(--swipe-page-x, 0px), 0, 0);
           opacity: var(--swipe-page-opacity, 1);
           will-change: transform, opacity;
+          backface-visibility: hidden;
+        }
+        .swipe-preview-layer {
+          transform: translate3d(var(--swipe-preview-x, 100%), 0, 0);
+          will-change: transform;
+          backface-visibility: hidden;
+          box-shadow: -16px 0 40px -8px rgba(0,0,0, var(--swipe-preview-shadow, 0));
         }
       `}</style>
-
-      {/* Page-level placeholder so motion-value-derived states are also
-          available to consumers if needed. */}
-      <motion.div style={{ x: pageX, opacity: pageOpacity }} className="hidden" aria-hidden />
     </>
   );
 }
