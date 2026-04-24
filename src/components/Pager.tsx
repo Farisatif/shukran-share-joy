@@ -1,24 +1,34 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate, Link } from "@tanstack/react-router";
-import { useMotionValue, animate, motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { MessageSquare, ChevronLeft, ChevronRight } from "lucide-react";
-import { useLang } from "./LanguageProvider";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useMotionValue, animate, useReducedMotion, type MotionValue } from "framer-motion";
 import { useSiteData } from "./SiteDataProvider";
 import { HomePage } from "./HomePage";
 import { CommentsPage } from "./CommentsPage";
 import { Navbar } from "./Navbar";
-import { ScrollProgress } from "./motion-primitives";
 
 /**
- * Pager — both /  and /comments are mounted side-by-side at all times in a
- * single horizontal track. Swiping translates the track. There is no route
- * navigation, no remount, no fetching — switching pages is purely visual.
+ * Pager — WhatsApp-style tabbed surface holding `/` and `/comments`.
  *
- * - The URL is updated silently (history.replaceState) after the page settles
- *   so deep links and shares work, but no router round-trip happens.
- * - Each page keeps its own vertical scroll position via a saved scrollTop.
- * - Page order in LTR: [Home (0), Comments (1)]. RTL flips visually only via
- *   the desiredSign math; the DOM order is kept stable so refs/state survive.
+ * Architecture (the part that fixes the "pages overlap / endless scroll" bug):
+ *  - The Pager itself is a `fixed inset-0 overflow-hidden` stage. The document
+ *    body never scrolls; only each page's own container does.
+ *  - Each page lives inside its own `overflow-y-auto overscroll-contain`
+ *    container. Their scroll positions are completely independent.
+ *  - The horizontal track translates via `translate3d(x, 0, 0)` only — no
+ *    scale, blur, parallax, or perspective. Pure GPU compositor work.
+ *
+ * Motion language (matches WhatsApp / iOS tab feel):
+ *  - tween easing `cubic-bezier(0.32, 0.72, 0, 1)` (the iOS standard curve).
+ *  - 260 ms for taps, ≤ 220 ms for finishing a swipe (velocity-aware).
+ *  - subtle opacity dim of the outgoing page (1 → 0.55) — quiet, not flashy.
+ *  - light edge resistance instead of bouncy rubber-band.
+ *
+ * Cross-component sync:
+ *  - The motion value `idxMV` is mirrored onto `<html>` as a CSS variable
+ *    `--pager-idx` (range 0..1). Navbar reads this to glide the pill
+ *    indicator perfectly in sync with the page motion (drag or tap).
+ *  - A custom event `pager:scroll` is dispatched from the active page so
+ *    Navbar can know whether the active page is scrolled (for its blur).
  */
 
 const PAGES = ["/", "/comments"] as const;
@@ -26,38 +36,58 @@ type PagePath = (typeof PAGES)[number];
 
 type Sample = { x: number; t: number };
 
+// iOS / WhatsApp standard easing.
+const EASE_OUT: [number, number, number, number] = [0.32, 0.72, 0, 1];
+
+// One shared motion value module-scoped so any component (Navbar) can read
+// the live pager position without prop drilling. It's a singleton because
+// there's only ever one pager mounted at a time.
+let sharedIdxMV: MotionValue<number> | null = null;
+
+export function getPagerIndexMV(): MotionValue<number> | null {
+  return sharedIdxMV;
+}
+
+export function navigateToPagerIndex(idx: 0 | 1) {
+  // Dispatched by Navbar tabs so Pager can run the animation through its
+  // own engine (keeps motion source single).
+  window.dispatchEvent(new CustomEvent("pager:goto", { detail: { idx } }));
+}
+
 export function Pager() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t, lang } = useLang();
   const { data } = useSiteData();
   const showComments = data.navigation?.showComments !== false;
-  const isRtl = lang === "ar";
   const reduceMotion = useReducedMotion();
 
-  // Active index derived from URL (only changes when URL truly changes).
   const activeIdx: 0 | 1 = location.pathname === "/comments" ? 1 : 0;
 
-  // If comments are disabled by CMS, render only the home page (no pager).
-  // Hooks below must still run unconditionally — guarded by `showComments`.
   const trackRef = useRef<HTMLDivElement>(null);
-  const homeRef = useRef<HTMLDivElement>(null);
-  const commentsRef = useRef<HTMLDivElement>(null);
+  const homeScrollerRef = useRef<HTMLDivElement>(null);
+  const commentsScrollerRef = useRef<HTMLDivElement>(null);
+  const homePageWrapRef = useRef<HTMLDivElement>(null);
+  const commentsPageWrapRef = useRef<HTMLDivElement>(null);
 
-  // Saved vertical scroll for each page.
+  // Per-page vertical scroll memory — independent of window scroll.
   const scrollMemory = useRef<Record<PagePath, number>>({ "/": 0, "/comments": 0 });
 
-  // Motion value: index (0..1) of the visible page.
   const idxMV = useMotionValue<number>(activeIdx);
 
-  // Track width = window.innerWidth.
+  // Publish the motion value as a singleton + as a CSS variable on <html>.
+  useLayoutEffect(() => {
+    sharedIdxMV = idxMV;
+    return () => {
+      if (sharedIdxMV === idxMV) sharedIdxMV = null;
+    };
+  }, [idxMV]);
+
   const widthRef = useRef(typeof window !== "undefined" ? window.innerWidth : 0);
 
-  // Drag state.
   const [dragging, setDragging] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
-  const startIdx = useRef(activeIdx as number);
+  const startIdx = useRef<number>(activeIdx);
   const samples = useRef<Sample[]>([]);
   const active = useRef(false);
   const locked = useRef<"h" | "v" | null>(null);
@@ -65,106 +95,143 @@ export function Pager() {
   const rafPending = useRef<number | null>(null);
   const lastEventX = useRef(0);
 
-  // Sync motion value to active index when URL changes from outside (links).
-  useEffect(() => {
-    const current = idxMV.get();
-    if (Math.abs(current - activeIdx) > 0.001) {
-      animate(idxMV, activeIdx, {
-        type: "spring",
-        stiffness: 320,
-        damping: 38,
-        mass: 1.05,
-        restDelta: 0.001,
-      });
-    }
-  }, [activeIdx, idxMV]);
-
-  // Apply translation + per-page depth transforms. Compositor-only, no layout.
-  // The track translates the full distance; each page additionally gets a small
-  // counter-parallax + scale + opacity based on its distance from "centered",
-  // producing an iOS/visionOS-style depth feel without ever revealing the seam.
+  // Apply translation + subtle opacity dim. Compositor-only.
   useLayoutEffect(() => {
     const apply = (i: number) => {
-      const w = widthRef.current || window.innerWidth;
-      // In RTL we visually mirror by translating the OPPOSITE direction.
-      const sign = isRtl ? +1 : -1;
-      const tx = sign * i * w;
+      const w = widthRef.current || window.innerWidth || 1;
+      const tx = -i * w; // LTR: page 1 lives to the right; track moves left to reveal it.
       if (trackRef.current) {
         trackRef.current.style.transform = `translate3d(${tx}px, 0, 0)`;
       }
-      // Per-page depth: distance in [0..1] from each page's "centered" state.
-      // Home is centered at i=0, Comments at i=1.
-      const dHome = Math.min(1, Math.max(0, Math.abs(i)));         // 0 when home is active
-      const dComm = Math.min(1, Math.max(0, Math.abs(1 - i)));     // 0 when comments active
-      // Subtle: max 4% scale-down, max 35% opacity dim, slight inward parallax (8% of width).
-      const setDepth = (el: HTMLDivElement | null, d: number, dir: -1 | 1) => {
-        if (!el) return;
-        const scale = 1 - d * 0.04;
-        const opacity = 1 - d * 0.35;
-        const px = dir * d * w * 0.08; // counter-parallax in screen px
-        el.style.transform = `translate3d(${px}px, 0, 0) scale(${scale})`;
-        el.style.opacity = String(opacity);
-        el.style.filter = d > 0.001 ? `blur(${(d * 1.2).toFixed(2)}px)` : "none";
-      };
-      // Outgoing page parallaxes inward (toward the side it came from).
-      // In LTR: home parallaxes RIGHT (+) when leaving; comments parallaxes LEFT (-).
-      // RTL flips the directions.
-      const homeDir = (isRtl ? -1 : +1) as -1 | 1;
-      const commDir = (isRtl ? +1 : -1) as -1 | 1;
-      setDepth(homeRef.current, dHome, homeDir);
-      setDepth(commentsRef.current, dComm, commDir);
+      // Mirror as CSS variable for any component that wants to react in sync.
+      document.documentElement.style.setProperty("--pager-idx", i.toFixed(4));
+
+      // Subtle outgoing-page dim. Distance from this page being centered.
+      const dHome = Math.min(1, Math.max(0, Math.abs(i)));
+      const dComm = Math.min(1, Math.max(0, Math.abs(1 - i)));
+      if (homePageWrapRef.current) {
+        homePageWrapRef.current.style.opacity = String(1 - dHome * 0.45);
+      }
+      if (commentsPageWrapRef.current) {
+        commentsPageWrapRef.current.style.opacity = String(1 - dComm * 0.45);
+      }
     };
     apply(idxMV.get());
     const unsub = idxMV.on("change", apply);
-    return () => unsub();
-  }, [idxMV, isRtl]);
-
-  // Save / restore vertical scroll per page.
-  // When the user lands on the page (via swipe end or URL change), restore.
-  // While they scroll, save continuously for the active page.
-  useEffect(() => {
-    const onScroll = () => {
-      const path = activeIdx === 0 ? "/" : "/comments";
-      scrollMemory.current[path] = window.scrollY;
+    const onResize = () => {
+      widthRef.current = window.innerWidth;
+      apply(idxMV.get());
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [activeIdx]);
+    window.addEventListener("resize", onResize, { passive: true });
+    widthRef.current = window.innerWidth;
+    apply(idxMV.get());
+    return () => {
+      unsub();
+      window.removeEventListener("resize", onResize);
+    };
+  }, [idxMV]);
 
+  // Save scroll for the currently-active page on every scroll tick + emit
+  // a `pager:scroll` event (Navbar listens to set its blurred state).
+  useEffect(() => {
+    const home = homeScrollerRef.current;
+    const comm = commentsScrollerRef.current;
+    if (!home || !comm) return;
+
+    const dispatchActiveScroll = (top: number) => {
+      window.dispatchEvent(new CustomEvent("pager:scroll", { detail: { top } }));
+    };
+
+    const onHomeScroll = () => {
+      scrollMemory.current["/"] = home.scrollTop;
+      if (Math.round(idxMV.get()) === 0) dispatchActiveScroll(home.scrollTop);
+    };
+    const onCommScroll = () => {
+      scrollMemory.current["/comments"] = comm.scrollTop;
+      if (Math.round(idxMV.get()) === 1) dispatchActiveScroll(comm.scrollTop);
+    };
+    home.addEventListener("scroll", onHomeScroll, { passive: true });
+    comm.addEventListener("scroll", onCommScroll, { passive: true });
+    // Emit initial state.
+    dispatchActiveScroll(activeIdx === 0 ? home.scrollTop : comm.scrollTop);
+    return () => {
+      home.removeEventListener("scroll", onHomeScroll);
+      comm.removeEventListener("scroll", onCommScroll);
+    };
+  }, [activeIdx, idxMV]);
+
+  // After settling on a new page, restore that page's scroll position and
+  // emit a scroll event so Navbar updates blur immediately.
   const restoreScroll = useCallback((idx: 0 | 1) => {
     const path = idx === 0 ? "/" : "/comments";
+    const target = idx === 0 ? homeScrollerRef.current : commentsScrollerRef.current;
     const y = scrollMemory.current[path] ?? 0;
-    window.scrollTo({ top: y, left: 0, behavior: "auto" });
+    if (target) target.scrollTop = y;
+    window.dispatchEvent(new CustomEvent("pager:scroll", { detail: { top: y } }));
   }, []);
 
-  // On URL change from outside (link click), restore that page's scroll.
-  useEffect(() => {
-    if (!dragging) {
-      requestAnimationFrame(() => restoreScroll(activeIdx));
-    }
-  }, [activeIdx, dragging, restoreScroll]);
-
-  // Update the URL silently after settle (no router navigation).
+  // Sync URL silently — no remount, no router round-trip.
   const setUrlSilently = useCallback((idx: 0 | 1) => {
     const target = idx === 0 ? "/" : "/comments";
     if (window.location.pathname === target) return;
     window.history.replaceState({}, "", target);
-    // Notify TanStack router so its location state matches the URL.
-    // This avoids a re-mount because the URL was changed via replaceState.
     navigate({ to: target, replace: true, resetScroll: false }).catch(() => { /* no-op */ });
   }, [navigate]);
 
-  // Velocity over last 80ms.
+  // Tween animation engine — same curve everywhere.
+  const tweenTo = useCallback((target: number, duration: number, onDone?: () => void) => {
+    return animate(idxMV, target, {
+      duration,
+      ease: EASE_OUT,
+      onComplete: onDone,
+    });
+  }, [idxMV]);
+
+  // Public goto used by Navbar tabs and keyboard.
+  const goto = useCallback((next: 0 | 1, opts?: { immediate?: boolean }) => {
+    const cur = Math.round(idxMV.get()) as 0 | 1;
+    if (cur === next && Math.abs(idxMV.get() - next) < 0.001) return;
+    if (opts?.immediate || reduceMotion) {
+      idxMV.set(next);
+      setUrlSilently(next);
+      requestAnimationFrame(() => restoreScroll(next));
+      return;
+    }
+    tweenTo(next, 0.26, () => {
+      setUrlSilently(next);
+      requestAnimationFrame(() => restoreScroll(next));
+    });
+  }, [idxMV, reduceMotion, restoreScroll, setUrlSilently, tweenTo]);
+
+  // Listen for goto requests from Navbar tabs.
+  useEffect(() => {
+    const onGoto = (e: Event) => {
+      const ce = e as CustomEvent<{ idx: 0 | 1 }>;
+      goto(ce.detail.idx);
+    };
+    window.addEventListener("pager:goto", onGoto);
+    return () => window.removeEventListener("pager:goto", onGoto);
+  }, [goto]);
+
+  // Sync motion value when URL changes from outside (Link navigation, back/forward).
+  useEffect(() => {
+    const cur = idxMV.get();
+    if (Math.abs(cur - activeIdx) > 0.001) {
+      tweenTo(activeIdx, 0.26, () => restoreScroll(activeIdx));
+    }
+  }, [activeIdx, idxMV, restoreScroll, tweenTo]);
+
+  // Velocity over last ~70 ms (px / ms in screen coords).
   const computeVelocity = useCallback(() => {
     const now = performance.now();
     const arr = samples.current;
     let i = arr.length - 1;
-    while (i > 0 && now - arr[i - 1].t < 80) i--;
+    while (i > 0 && now - arr[i - 1].t < 70) i--;
     if (arr.length < 2 || i >= arr.length - 1) return 0;
     const a = arr[i];
     const b = arr[arr.length - 1];
     const dt = Math.max(1, b.t - a.t);
-    return (b.x - a.x) / dt; // px/ms (signed in screen coords)
+    return (b.x - a.x) / dt;
   }, []);
 
   const isInteractive = useCallback((el: EventTarget | null): boolean => {
@@ -183,17 +250,13 @@ export function Pager() {
     return false;
   }, []);
 
-  const haptic = (ms: number) => {
-    try { if ("vibrate" in navigator) navigator.vibrate(ms); } catch { /* no-op */ }
-  };
-
   // Pointer-driven swipe.
   useEffect(() => {
     if (!showComments || reduceMotion) return;
 
-    const COMMIT_FRACTION = 0.25; // 25% of width to commit
-    const FLICK_VEL = 0.45;       // px/ms
-    const EDGE_PRIORITY_PX = 32;
+    const COMMIT_FRACTION = 0.18;
+    const FLICK_VEL = 0.35; // px / ms
+    const MIN_DEAD_ZONE = 8;
 
     const reset = () => {
       active.current = false;
@@ -209,15 +272,7 @@ export function Pager() {
 
     const onStart = (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      const w = window.innerWidth;
-      const idx = Math.round(idxMV.get()) as 0 | 1;
-      // For commit-direction edge priority:
-      const desiredSign = idx === 0 ? (isRtl ? +1 : -1) : (isRtl ? -1 : +1);
-      const fromCommitEdge =
-        (desiredSign === -1 && e.clientX > w - EDGE_PRIORITY_PX) ||
-        (desiredSign === +1 && e.clientX < EDGE_PRIORITY_PX);
-      if (!fromCommitEdge && isInteractive(e.target)) return;
-
+      if (isInteractive(e.target)) return;
       startX.current = e.clientX;
       startY.current = e.clientY;
       lastEventX.current = e.clientX;
@@ -226,7 +281,7 @@ export function Pager() {
       active.current = true;
       locked.current = null;
       pointerId.current = e.pointerId;
-      widthRef.current = w;
+      widthRef.current = window.innerWidth;
     };
 
     const flush = () => {
@@ -234,12 +289,10 @@ export function Pager() {
       if (!active.current || locked.current !== "h") return;
       const dx = lastEventX.current - startX.current;
       const w = widthRef.current || 1;
-      // RTL: dragging RIGHT moves toward higher index. LTR: dragging LEFT moves toward higher index.
-      const dragDelta = isRtl ? dx / w : -dx / w;
-      let next = startIdx.current + dragDelta;
-      // Rubber-band beyond edges.
-      if (next < 0) next = -Math.tanh(-next * 1.5) * 0.12;
-      if (next > 1) next = 1 + Math.tanh((next - 1) * 1.5) * 0.12;
+      let next = startIdx.current - dx / w;
+      // Light edge resistance (≈ 14% of remaining distance, no spring).
+      if (next < 0) next = next * 0.18;
+      if (next > 1) next = 1 + (next - 1) * 0.18;
       idxMV.set(next);
     };
 
@@ -250,19 +303,10 @@ export function Pager() {
       const dy = e.clientY - startY.current;
 
       if (locked.current === null) {
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-        const w = widthRef.current || window.innerWidth;
-        const edgeStart = startX.current < 32 || startX.current > w - 32;
-        const horizontalWins = edgeStart
-          ? Math.abs(dx) > Math.abs(dy) * 0.85
-          : Math.abs(dx) > Math.abs(dy) * 1.4;
-        if (horizontalWins) {
+        if (Math.abs(dx) < MIN_DEAD_ZONE && Math.abs(dy) < MIN_DEAD_ZONE) return;
+        if (Math.abs(dx) > Math.abs(dy) * 1.2) {
           locked.current = "h";
           setDragging(true);
-          // Save current page's scroll BEFORE we start dragging.
-          const idx = Math.round(startIdx.current) as 0 | 1;
-          const path = idx === 0 ? "/" : "/comments";
-          scrollMemory.current[path] = window.scrollY;
           try { (e.target as Element | null)?.setPointerCapture?.(e.pointerId); } catch { /* no-op */ }
         } else {
           locked.current = "v";
@@ -273,7 +317,7 @@ export function Pager() {
 
       const now = performance.now();
       samples.current.push({ x: e.clientX, t: now });
-      while (samples.current.length > 2 && now - samples.current[0].t > 150) samples.current.shift();
+      while (samples.current.length > 2 && now - samples.current[0].t > 140) samples.current.shift();
       lastEventX.current = e.clientX;
       if (rafPending.current === null) rafPending.current = requestAnimationFrame(flush);
     };
@@ -291,57 +335,36 @@ export function Pager() {
       const x = e ? e.clientX : lastEventX.current;
       const dx = x - startX.current;
       const w = widthRef.current || window.innerWidth;
-
-      // Convert finger velocity to "index velocity" (units per ms).
       const rawVel = computeVelocity();
-      const idxVel = isRtl ? rawVel / w : -rawVel / w;
+      // Convert finger velocity to index velocity (positive = moving forward).
+      const idxVel = -rawVel / w;
 
-      const current = idxMV.get();
-      const fractional = current - Math.floor(current);
       const startedAt = Math.round(startIdx.current) as 0 | 1;
+      const projectedDx = startedAt === 0 ? -dx : dx; // forward distance in commit direction
+      const flick = Math.abs(rawVel) > FLICK_VEL && (
+        startedAt === 0 ? rawVel < 0 : rawVel > 0
+      );
 
-      // Direction we're moving in based on net dx and rtl.
-      const movingForward = (isRtl ? dx > 0 : dx < 0); // toward higher index
-      // Predicted final index using momentum.
-      const predicted = current + idxVel * 90;
-      const predictedSnap = predicted >= startedAt + COMMIT_FRACTION ? 1
-        : predicted <= startedAt - COMMIT_FRACTION ? 0
-        : startedAt;
-
-      const flickCommit = Math.abs(idxVel) > FLICK_VEL / w * 1; // normalized flick
-      const distCommit = startedAt === 0
-        ? fractional >= COMMIT_FRACTION
-        : 1 - fractional >= COMMIT_FRACTION;
-
-      let target: 0 | 1;
-      if (flickCommit) {
-        target = movingForward ? Math.min(1, startedAt + 1) as 0 | 1 : Math.max(0, startedAt - 1) as 0 | 1;
-      } else if (distCommit) {
+      let target: 0 | 1 = startedAt;
+      if (flick) {
+        target = startedAt === 0 ? 1 : 0;
+      } else if (projectedDx > w * COMMIT_FRACTION) {
         target = startedAt === 0 ? 1 : 0;
       } else {
-        target = predictedSnap as 0 | 1;
+        target = startedAt;
       }
-
-      const willCommit = target !== startedAt;
-      const handoffVel = idxVel; // signed, in idx/ms
 
       reset();
 
-      if (willCommit) haptic(10);
+      // Duration shortens with velocity for a snappy WhatsApp feel.
+      const speed = Math.abs(idxVel);
+      const distance = Math.abs(target - idxMV.get());
+      const baseDuration = 0.22;
+      const duration = Math.max(0.14, Math.min(0.28, baseDuration / (1 + speed * 30) + distance * 0.06));
 
-      animate(idxMV, target, {
-        type: "spring",
-        stiffness: 340,
-        damping: 40,
-        mass: 1.0,
-        velocity: handoffVel,
-        restDelta: 0.001,
-        onComplete: () => {
-          // Update URL silently — NO remount.
-          setUrlSilently(target);
-          // Restore vertical scroll for the new page.
-          requestAnimationFrame(() => restoreScroll(target));
-        },
+      tweenTo(target, duration, () => {
+        setUrlSilently(target);
+        requestAnimationFrame(() => restoreScroll(target));
       });
     };
 
@@ -354,9 +377,9 @@ export function Pager() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
     };
-  }, [computeVelocity, idxMV, isRtl, isInteractive, reduceMotion, restoreScroll, setUrlSilently, showComments]);
+  }, [computeVelocity, idxMV, isInteractive, reduceMotion, restoreScroll, setUrlSilently, showComments, tweenTo]);
 
-  // Keyboard nav.
+  // Keyboard: ←/→ switch tabs.
   useEffect(() => {
     if (!showComments) return;
     const onKey = (e: KeyboardEvent) => {
@@ -364,138 +387,83 @@ export function Pager() {
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      const idx = Math.round(idxMV.get()) as 0 | 1;
-      const wantsForward = isRtl ? e.key === "ArrowLeft" : e.key === "ArrowRight";
-      const next: 0 | 1 = wantsForward ? 1 : 0;
-      if (next === idx) return;
+      const cur = Math.round(idxMV.get()) as 0 | 1;
+      const next: 0 | 1 = e.key === "ArrowRight" ? 1 : 0;
+      if (next === cur) return;
       e.preventDefault();
-      const path = idx === 0 ? "/" : "/comments";
-      scrollMemory.current[path] = window.scrollY;
-      animate(idxMV, next, {
-        type: "spring",
-        stiffness: 340,
-        damping: 40,
-        mass: 1.0,
-        restDelta: 0.001,
-        onComplete: () => {
-          setUrlSilently(next);
-          requestAnimationFrame(() => restoreScroll(next));
-        },
-      });
+      goto(next);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idxMV, isRtl, restoreScroll, setUrlSilently, showComments]);
+  }, [goto, idxMV, showComments]);
 
-  // If comments are hidden, render just the active page without pager.
+  // Lock body scroll while pager is mounted (we own all scrolling now).
+  useLayoutEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
+  // Pages content (memo to avoid re-renders during drag).
+  const homePageEl = useMemo(() => <HomePage />, []);
+  const commentsPageEl = useMemo(() => <CommentsPage />, []);
+
+  // If comments are hidden by CMS, render only home — no pager wrapper.
   if (!showComments) {
     return (
       <>
-        <ScrollProgress />
         <Navbar />
-        {activeIdx === 1 ? <CommentsPage /> : <HomePage />}
+        <div className="fixed inset-0 overflow-y-auto overscroll-contain">
+          {homePageEl}
+        </div>
       </>
     );
   }
 
-  // Edge affordance — points to the OTHER page.
-  const isOnHome = activeIdx === 0;
-  const handleOnRight = isOnHome ? !isRtl : isRtl;
-  const edgeClass = handleOnRight ? "right-0" : "left-0";
-  const Arrow = handleOnRight ? ChevronLeft : ChevronRight;
-  const handleLabel = isOnHome ? t("Comments", "التعليقات") : t("Portfolio", "البروفايل");
-  const handleIcon = isOnHome ? <MessageSquare className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />;
-  const otherPath: PagePath = isOnHome ? "/comments" : "/";
-
-  const navOther = () => {
-    const next: 0 | 1 = isOnHome ? 1 : 0;
-    const path = isOnHome ? "/" : "/comments";
-    scrollMemory.current[path] = window.scrollY;
-    animate(idxMV, next, {
-      type: "spring",
-      stiffness: 340,
-      damping: 40,
-      mass: 1.0,
-      restDelta: 0.001,
-      onComplete: () => {
-        setUrlSilently(next);
-        requestAnimationFrame(() => restoreScroll(next));
-      },
-    });
-  };
-
   return (
     <>
-      {/* Fixed UI that lives ABOVE the sliding track — never moves with the swipe. */}
-      <ScrollProgress />
       <Navbar />
-
-      {/* The horizontal track — both pages mounted, side-by-side. */}
-      <div className="relative w-full overflow-x-clip" style={{ perspective: "1600px" }}>
+      <div className="fixed inset-0 overflow-hidden bg-background">
         <div
           ref={trackRef}
-          className={`flex w-[200vw] ${isRtl ? "flex-row-reverse" : "flex-row"} will-change-transform`}
-          style={{ transform: "translate3d(0,0,0)", backfaceVisibility: "hidden" }}
+          className="flex h-full w-[200%] will-change-transform"
+          style={{ transform: "translate3d(0,0,0)" }}
         >
+          {/* Home */}
           <div
-            ref={homeRef}
-            className="w-screen shrink-0 will-change-transform"
-            style={{ transformOrigin: isRtl ? "left center" : "right center", backfaceVisibility: "hidden" }}
+            ref={homePageWrapRef}
+            className="w-1/2 h-full shrink-0"
+            style={{ willChange: "opacity" }}
           >
-            <HomePage />
+            <div
+              ref={homeScrollerRef}
+              className="h-full overflow-y-auto overscroll-contain"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {homePageEl}
+            </div>
           </div>
+          {/* Comments */}
           <div
-            ref={commentsRef}
-            className="w-screen shrink-0 will-change-transform"
-            style={{ transformOrigin: isRtl ? "right center" : "left center", backfaceVisibility: "hidden" }}
+            ref={commentsPageWrapRef}
+            className="w-1/2 h-full shrink-0"
+            style={{ willChange: "opacity" }}
           >
-            <CommentsPage />
+            <div
+              ref={commentsScrollerRef}
+              className="h-full overflow-y-auto overscroll-contain"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {commentsPageEl}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Desktop edge pill */}
-      <motion.button
-        type="button"
-        aria-label={handleLabel}
-        onClick={navOther}
-        initial={{ opacity: 0, x: handleOnRight ? 16 : -16 }}
-        animate={{ opacity: dragging ? 0 : 1, x: 0 }}
-        transition={{ opacity: { duration: 0.4, delay: 0.5 } }}
-        data-no-swipe="true"
-        className={`fixed top-1/2 -translate-y-1/2 ${edgeClass} z-40 hidden md:flex items-center gap-2 ${handleOnRight ? "rounded-l-full pl-3 pr-2.5" : "rounded-r-full pr-3 pl-2.5"} bg-card/85 backdrop-blur-xl border border-border py-2.5 soft-shadow text-foreground/85 hover:text-foreground hover:bg-card transition-colors group`}
-      >
-        {handleOnRight ? (
-          <>
-            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">{handleIcon}</span>
-            <span className="text-[11px] font-medium uppercase tracking-[0.18em]">{handleLabel}</span>
-            <Arrow className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:-translate-x-0.5" />
-          </>
-        ) : (
-          <>
-            <Arrow className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:translate-x-0.5" />
-            <span className="text-[11px] font-medium uppercase tracking-[0.18em]">{handleLabel}</span>
-            <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">{handleIcon}</span>
-          </>
-        )}
-      </motion.button>
-
-      {/* Mobile thin edge tab */}
-      <motion.button
-        type="button"
-        aria-label={handleLabel}
-        onClick={navOther}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: dragging ? 0 : 0.85 }}
-        transition={{ duration: 0.4, delay: 0.5 }}
-        data-no-swipe="true"
-        className={`fixed top-1/2 -translate-y-1/2 ${edgeClass} z-40 md:hidden h-16 w-1.5 ${handleOnRight ? "rounded-l-full" : "rounded-r-full"} bg-primary/70`}
-      />
-
-      {/* Hidden anchor for SEO crawlers — real <Link> ensures the route is in the sitemap. */}
-      <AnimatePresence>
-        {false && <Link to={otherPath} className="sr-only">{handleLabel}</Link>}
-      </AnimatePresence>
     </>
   );
 }

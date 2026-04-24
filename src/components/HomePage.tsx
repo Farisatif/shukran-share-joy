@@ -17,7 +17,7 @@ export function HomePage() {
   const tagsEn = data.personal.en.taglines;
   const tagsAr = data.personal.ar.taglines;
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-full bg-background text-foreground">
       <Hero />
       <Marquee items={tagsEn} itemsAr={tagsAr} key={lang} />
       <SectionBand variant="light" pattern="none" divider roundBottom>
