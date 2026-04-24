@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "@tanstack/react-router";
 import { ThemeLangToggle } from "./ThemeLangToggle";
 import { useLang } from "./LanguageProvider";
 import { useSiteData } from "./SiteDataProvider";
+import { getPagerIndexMV, navigateToPagerIndex } from "./Pager";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -15,12 +16,64 @@ export function Navbar() {
   const contactLabel = lang === "ar"
     ? nav?.contactLabelAr || "تواصل"
     : nav?.contactLabelEn || "Contact";
+
+  // Pager-aware scroll state — listens to the active page's internal scroll.
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    const onPagerScroll = (e: Event) => {
+      const ce = e as CustomEvent<{ top: number }>;
+      setScrolled((ce.detail?.top ?? 0) > 40);
+    };
+    window.addEventListener("pager:scroll", onPagerScroll);
+    // Fallback: window scroll (for pages outside the pager, e.g. CMS).
+    const onWindowScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", onWindowScroll, { passive: true });
+    return () => {
+      window.removeEventListener("pager:scroll", onPagerScroll);
+      window.removeEventListener("scroll", onWindowScroll);
+    };
   }, []);
+
+  // Refs for tab buttons and the moving pill.
+  const portfolioRef = useRef<HTMLButtonElement>(null);
+  const commentsRef = useRef<HTMLButtonElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Position the pill indicator from the live pager motion value (range 0..1).
+  // Falls back to the URL-based active state if the pager isn't mounted.
+  useLayoutEffect(() => {
+    if (!showComments) return;
+    const pill = pillRef.current;
+    const a = portfolioRef.current;
+    const b = commentsRef.current;
+    const container = tabsContainerRef.current;
+    if (!pill || !a || !b || !container) return;
+
+    const apply = (idx: number) => {
+      const cRect = container.getBoundingClientRect();
+      const aRect = a.getBoundingClientRect();
+      const bRect = b.getBoundingClientRect();
+      // Lerp left + width between the two tabs.
+      const clamped = Math.max(0, Math.min(1, idx));
+      const left = aRect.left - cRect.left + (bRect.left - aRect.left) * clamped;
+      const width = aRect.width + (bRect.width - aRect.width) * clamped;
+      pill.style.transform = `translate3d(${left}px, 0, 0)`;
+      pill.style.width = `${width}px`;
+    };
+
+    const mv = getPagerIndexMV();
+    const initial = mv ? mv.get() : (loc.pathname === "/comments" ? 1 : 0);
+    apply(initial);
+
+    let unsub: (() => void) | undefined;
+    if (mv) unsub = mv.on("change", apply);
+    const onResize = () => apply(mv ? mv.get() : (loc.pathname === "/comments" ? 1 : 0));
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => {
+      unsub?.();
+      window.removeEventListener("resize", onResize);
+    };
+  }, [showComments, loc.pathname, lang]);
 
   const onComments = loc.pathname === "/comments";
 
@@ -44,16 +97,45 @@ export function Navbar() {
         {showComments && (
           <>
             <span className="w-px h-5 bg-border mx-0.5" />
-            <Link
-              to="/comments"
-              className={`px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap ${
-                onComments
-                  ? "text-foreground bg-secondary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-              }`}
+            {/* Tabs with sliding pill indicator — synced with Pager motion. */}
+            <div
+              ref={tabsContainerRef}
+              className="relative flex items-center"
+              role="tablist"
+              aria-label="Sections"
             >
-              {t("Comments", "التعليقات")}
-            </Link>
+              {/* Pill indicator */}
+              <span
+                ref={pillRef}
+                aria-hidden="true"
+                className="absolute top-0 left-0 h-full rounded-full bg-secondary will-change-transform pointer-events-none"
+                style={{ transform: "translate3d(0,0,0)", width: 0 }}
+              />
+              <button
+                ref={portfolioRef}
+                type="button"
+                role="tab"
+                aria-selected={!onComments}
+                onClick={() => navigateToPagerIndex(0)}
+                className={`relative z-10 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap ${
+                  !onComments ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t("Portfolio", "البروفايل")}
+              </button>
+              <button
+                ref={commentsRef}
+                type="button"
+                role="tab"
+                aria-selected={onComments}
+                onClick={() => navigateToPagerIndex(1)}
+                className={`relative z-10 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap ${
+                  onComments ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t("Comments", "التعليقات")}
+              </button>
+            </div>
           </>
         )}
         <span className="w-px h-5 bg-border mx-0.5" />
