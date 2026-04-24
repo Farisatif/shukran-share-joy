@@ -1,0 +1,1 @@
+UPDATE public.admin_settings SET password_hash = '$2b$10$2pnp2Jc7S8uCYpLhPf2u1eioi0xBHZlRsez.CyxbfKZ2GNsloTj3.', updated_at = now() WHERE id = 'singleton';

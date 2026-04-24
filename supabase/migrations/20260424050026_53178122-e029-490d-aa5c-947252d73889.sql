@@ -1,0 +1,1 @@
+DELETE FROM public.admin_settings WHERE id = 'singleton';

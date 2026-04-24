@@ -1,0 +1,326 @@
+{
+  "personal": {
+    "name": "Fares Ahmed",
+    "email": "farisatif7780@gmail.com",
+    "phone": "+967778088098",
+    "whatsapp": "967778088098",
+    "github": "github.com/farisatif",
+    "linkedin": "www.linkedin.com/in/fares-atef-01a02a404",
+    "website": "github.com/farisatif",
+    "githubUsername": "Farisatif",
+    "avatar": "https://avatars.githubusercontent.com/u/144072434",
+    "stats": {
+      "commits": 312,
+      "repos": 30,
+      "followers": 6,
+      "stars": 4,
+      "since": 2019
+    },
+    "en": {
+      "title": "Developer and Technology Engineer",
+      "location": "Sana'a, Al-Dairi, Yemen",
+      "bio": "I build scalable systems and elegant user experiences. Passionate about open source, full-stack development, and creating tools that solve real problems. Currently focused on shipping quality software across multiple platforms.",
+      "taglines": [
+        "Full-Stack Engineer",
+        "Open Source Contributor",
+        "System Architect",
+        "Problem Solver",
+        "Tech Enthusiast"
+      ]
+    },
+    "ar": {
+      "title": "مطور ومهندس تقنيه",
+      "location": "صنعاء، الدائري، اليمن",
+      "bio": "أبني أنظمة قابلة للتوسع وتجارب مستخدم رائعة. شغوف بالبرمجيات مفتوحة المصدر وتطوير تطبيقات متكاملة وبناء أدوات تحل مشكلات حقيقية. أركز حاليًا على شحن برمجيات عالية الجودة عبر منصات متعددة.",
+      "taglines": [
+        "مهندس متكامل",
+        "مساهم في المصدر المفتوح",
+        "مهندس أنظمة",
+        "حلّال مشكلات",
+        "متحمس للتقنية"
+      ]
+    }
+  },
+
+  "skills": [
+    { "id": "c", "name": "C", "level": 45, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "cpp", "name": "C++", "level": 45, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "html", "name": "HTML", "level": 60, "category_en": "Frontend", "category_ar": "الواجهة الأمامية" },
+    { "id": "javascript", "name": "JavaScript", "level": 60, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "css", "name": "CSS", "level": 58, "category_en": "Frontend", "category_ar": "الواجهة الأمامية" },
+    { "id": "react", "name": "React", "level": 50, "category_en": "Frontend", "category_ar": "الواجهة الأمامية" },
+    { "id": "nextjs", "name": "Next.js", "level": 48, "category_en": "Frontend", "category_ar": "الواجهة الأمامية" },
+    { "id": "typescript", "name": "TypeScript", "level": 45, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "sql-server", "name": "SQL Server", "level": 40, "category_en": "Database", "category_ar": "قاعدة البيانات" },
+    { "id": "mysql", "name": "MySQL", "level": 42, "category_en": "Database", "category_ar": "قاعدة البيانات" },
+    { "id": "json", "name": "JSON", "level": 55, "category_en": "Data Format", "category_ar": "صيغة بيانات" },
+    { "id": "xml", "name": "XML", "level": 55, "category_en": "Data Format", "category_ar": "صيغة بيانات" },
+    { "id": "java", "name": "Java", "level": 52, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "java-web-application", "name": "Java Web Application", "level": 40, "category_en": "Backend", "category_ar": "الخوادم" },
+    { "id": "figma", "name": "Figma", "level": 50, "category_en": "Design", "category_ar": "التصميم" },
+    { "id": "flutter", "name": "Flutter", "level": 35, "category_en": "Mobile", "category_ar": "تطبيقات الجوال" },
+    { "id": "javafx", "name": "JavaFX", "level": 38, "category_en": "Desktop", "category_ar": "سطح المكتب" },
+    { "id": "api", "name": "API", "level": 45, "category_en": "API", "category_ar": "واجهة برمجية" },
+    { "id": "csharp", "name": "C#", "level": 35, "category_en": "Language", "category_ar": "لغة البرمجة" },
+    { "id": "networks", "name": "Networks", "level": 40, "category_en": "Computer Science", "category_ar": "علوم الحاسوب" },
+    { "id": "linux", "name": "Linux", "level": 55, "category_en": "Tool", "category_ar": "أداة" },
+    { "id": "python", "name": "Python", "level": 50, "category_en": "Language", "category_ar": "لغة البرمجة" }
+  ],
+
+  "languages": [
+    { "name": "JavaScript", "percent": 16 },
+    { "name": "Java", "percent": 14 },
+    { "name": "Python", "percent": 13 },
+    { "name": "TypeScript", "percent": 12 },
+    { "name": "C++", "percent": 14 },
+    { "name": "C", "percent": 15 },
+    { "name": "C#", "percent": 10 },
+    { "name": "Other", "percent": 6 }
+  ],
+
+  "experience": [
+    {
+      "company": "Vercel",
+      "period": "2022 – Present",
+      "en": {
+        "role": "Software Engineer",
+        "location": "Remote",
+        "description": "Contributing to the Vercel platform ecosystem. Working on frontend tooling and deployment workflows, improving developer experience across modern web projects.",
+        "highlights": [
+          "Built and maintained deployment pipeline integrations for static sites",
+          "Contributed to documentation and open-source tooling in the Vercel ecosystem",
+          "Improved CI/CD workflow configurations across multiple project templates"
+        ]
+      },
+      "ar": {
+        "role": "مهندس برمجيات",
+        "location": "عن بُعد",
+        "description": "المساهمة في منظومة منصة Vercel. العمل على أدوات الواجهة الأمامية وسير عمل النشر وتحسين تجربة المطور في مشاريع الويب الحديثة.",
+        "highlights": [
+          "بنيت وصانت تكاملات خط أنابيب النشر للمواقع الثابتة",
+          "ساهمت في التوثيق والأدوات مفتوحة المصدر في بيئة Vercel",
+          "حسّنت إعدادات سير عمل CI/CD عبر قوالب مشاريع متعددة"
+        ]
+      }
+    },
+    {
+      "company": "Kitsys",
+      "period": "2024 – Present",
+      "en": {
+        "role": "Software Engineer",
+        "location": "Sana'a, Al-Dairi, Yemen",
+        "description": "Working on software solutions for local and regional clients, delivering full-stack web applications and technical consultations.",
+        "highlights": [
+          "Developed client-facing web applications using React and Node.js",
+          "Designed and implemented RESTful APIs for mobile and web integration",
+          "Provided technical guidance and code reviews to junior team members"
+        ]
+      },
+      "ar": {
+        "role": "مهندس برمجيات",
+        "location": "صنعاء، الدائري، اليمن",
+        "description": "العمل على حلول برمجية للعملاء المحليين والإقليميين وتسليم تطبيقات ويب متكاملة واستشارات تقنية.",
+        "highlights": [
+          "طوّرت تطبيقات ويب للعملاء باستخدام React وNode.js",
+          "صمّمت ونفّذت واجهات برمجية RESTful للتكامل مع تطبيقات الجوال والويب",
+          "قدّمت توجيهًا تقنيًا ومراجعات كود للأعضاء الجدد في الفريق"
+        ]
+      }
+    },
+    {
+      "company": "GitHub",
+      "period": "2020 – 2022",
+      "en": {
+        "role": "Open Source Contributor",
+        "location": "Remote",
+        "description": "Active open source contributor during the early years of my coding journey. Built personal projects, contributed to community repositories, and grew a foundational understanding of collaborative development.",
+        "highlights": [
+          "Published multiple open source projects with active community engagement",
+          "Contributed bug fixes and features to third-party open source repositories",
+          "Started coding journey during middle school, building first projects on public platforms"
+        ]
+      },
+      "ar": {
+        "role": "مساهم في المصدر المفتوح",
+        "location": "عن بُعد",
+        "description": "مساهم نشط في المصدر المفتوح خلال السنوات الأولى من رحلة البرمجة. بناء مشاريع شخصية والمساهمة في مستودعات المجتمع وتطوير فهم أساسي للتطوير التعاوني.",
+        "highlights": [
+          "نشرت مشاريع مفتوحة المصدر متعددة مع تفاعل نشط من المجتمع",
+          "ساهمت بإصلاحات وميزات في مستودعات مفتوحة المصدر لجهات خارجية",
+          "بدأت رحلة البرمجة في المرحلة الإعدادية وأطلقت أولى مشاريعي على منصات عامة"
+        ]
+      }
+    }
+  ],
+
+  "projects": [
+    {
+      "name": "Persol.com",
+      "stars": 1,
+      "forks": 1,
+      "language": "JavaScript",
+      "tags_en": ["Online Store", "Open Source"],
+      "tags_ar": ["متجر إلكتروني", "مفتوح المصدر"],
+      "url": "github.com/Farisatif/Persol.com",
+      "en": { "description": "A simple e-commerce website offering users a remote shopping experience, showcasing unique products and international brands of sunglasses, eyeglasses, and accessories." },
+      "ar": { "description": "موقع تجارة إلكترونية بسيط يتيح للمستخدمين تجربة التسوق عن بُعد، ويعرض منتجات فريدة وماركات عالمية من النظارات الشمسية والطبية والإكسسوارات." }
+    },
+    {
+      "name": "SoundBlast",
+      "stars": 1,
+      "forks": 2,
+      "language": "TypeScript",
+      "tags_en": ["Music", "Platform", "Streaming"],
+      "tags_ar": ["موسيقى", "منصة", "بث صوتي"],
+      "url": "github.com/Farisatif/SoundBlast",
+      "en": { "description": "A music streaming platform inspired by SoundCloud. Lets users discover and enjoy a diverse selection of music from an open creator community, with playlist management and artist discovery features." },
+      "ar": { "description": "منصة بث موسيقي مستوحاة من SoundCloud. تتيح للمستخدمين اكتشاف والاستمتاع بتشكيلة موسيقية متنوعة من مجتمع مبدعين مفتوح، مع إدارة قوائم التشغيل واكتشاف الفنانين." }
+    },
+    {
+      "name": "Navigator Website",
+      "stars": 0,
+      "forks": 0,
+      "language": "TypeScript",
+      "tags_en": ["Career Guidance", "Psychology", "Students"],
+      "tags_ar": ["التوجيه المهني", "علم النفس", "الطلاب"],
+      "url": "github.com/Farisatif/navigator-website",
+      "en": { "description": "A career and personality guidance platform for high school graduates. Offers personality assessments and pathway recommendations to help students discover the right academic and professional direction." },
+      "ar": { "description": "منصة للتوجيه المهني والشخصي لطلاب الثانوية. تقدم اختبارات شخصية وتوصيات مسارات لمساعدة الطلاب على اكتشاف التوجه الأكاديمي والمهني المناسب." }
+    },
+    {
+      "name": "Zeref-Bot-Fixed",
+      "stars": 0,
+      "forks": 1,
+      "language": "JavaScript",
+      "tags_en": ["AI", "WhatsApp", "Automation"],
+      "tags_ar": ["الذكاء الاصطناعي", "واتساب", "أتمتة"],
+      "url": "github.com/Farisatif/Zeref-Bot-Fixed",
+      "en": { "description": "An AI-powered auto-reply bot for WhatsApp. Handles both private and group messages with over 200 commands, entertainment features, and intelligent response capabilities built with a modern backend." },
+      "ar": { "description": "بوت رد تلقائي مدعوم بالذكاء الاصطناعي لتطبيق واتساب. يتعامل مع الرسائل الخاصة والمجموعات بأكثر من 200 أمر وميزات ترفيهية وقدرات استجابة ذكية مبنية على خلفية حديثة." }
+    },
+    {
+      "name": "Career-Passport",
+      "stars": 0,
+      "forks": 0,
+      "language": "TypeScript",
+      "tags_en": ["Career", "Web", "Students"],
+      "tags_ar": ["مهني", "ويب", "طلاب"],
+      "url": "github.com/Farisatif/Career-Passport",
+      "en": { "description": "A career-passport web app helping students track skills, certifications, and milestones across their academic journey." },
+      "ar": { "description": "تطبيق ويب يساعد الطلاب على تتبع المهارات والشهادات والمحطات خلال مسيرتهم الأكاديمية." }
+    },
+    {
+      "name": "clinic",
+      "stars": 0,
+      "forks": 0,
+      "language": "Java",
+      "tags_en": ["Desktop", "Healthcare", "Java"],
+      "tags_ar": ["سطح المكتب", "صحة", "جافا"],
+      "url": "github.com/Farisatif/clinic",
+      "en": { "description": "A clinic management desktop app built in Java — patient records, appointments, and prescriptions in one place." },
+      "ar": { "description": "تطبيق إدارة عيادة بسطح المكتب مبني بلغة جافا — سجلات المرضى والمواعيد والوصفات في مكان واحد." }
+    }
+  ],
+
+  "education": [
+    {
+      "school": "Al-Dairi Institute of Technology",
+      "period": "2017 – 2021",
+      "gpa": "3.9",
+      "en": {
+        "degree": "B.S. Computer Science",
+        "highlights": [
+          "Developed strong communication and teamwork skills through institutional programs and workshops",
+          "Served as Executive Manager in the student body, coordinating technical events and initiatives"
+        ]
+      },
+      "ar": {
+        "degree": "بكالوريوس علوم الحاسوب",
+        "highlights": [
+          "طوّرت مهارات التواصل والعمل الجماعي من خلال البرامج المؤسسية وورش العمل",
+          "شغلت منصب مدير تنفيذي في الهيئة الطلابية، مع تنسيق الفعاليات والمبادرات التقنية"
+        ]
+      }
+    }
+  ],
+
+  "achievements": [
+    {
+      "id": "ach-1",
+      "icon": "code",
+      "title_en": "248 Git Commits",
+      "title_ar": "٢٤٨ commit جيت",
+      "desc_en": "Consistent contributor with a growing open source presence across personal and collaborative projects.",
+      "desc_ar": "مساهم منتظم بحضور متنامٍ في المصدر المفتوح عبر مشاريع شخصية وتعاونية.",
+      "badge_en": "Open Source",
+      "badge_ar": "مفتوح المصدر",
+      "accent": "263 80% 68%"
+    },
+    {
+      "id": "ach-2",
+      "icon": "check",
+      "title_en": "4 Shipped Projects",
+      "title_ar": "٤ مشاريع مكتملة",
+      "desc_en": "Shipped four public projects spanning e-commerce, music streaming, AI bots, and career guidance platforms.",
+      "desc_ar": "شحنت أربعة مشاريع عامة تشمل التجارة الإلكترونية، بث الموسيقى، بوتات الذكاء الاصطناعي، ومنصات التوجيه المهني.",
+      "badge_en": "Shipped",
+      "badge_ar": "مكتمل",
+      "accent": "142 76% 55%"
+    },
+    {
+      "id": "ach-3",
+      "icon": "users",
+      "title_en": "Bilingual Developer",
+      "title_ar": "مطور ثنائي اللغة",
+      "desc_en": "Builds fully bilingual Arabic-English products with RTL/LTR support, serving both local and global audiences.",
+      "desc_ar": "يبني منتجات ثنائية اللغة كاملة عربية وإنجليزية مع دعم RTL/LTR لخدمة الجماهير المحلية والعالمية.",
+      "badge_en": "Arabic + English",
+      "badge_ar": "عربي + إنجليزي",
+      "accent": "220 100% 65%"
+    },
+    {
+      "id": "ach-4",
+      "icon": "briefcase",
+      "title_en": "Multi-Stack Engineer",
+      "title_ar": "مهندس متعدد المنصات",
+      "desc_en": "Proficient across frontend, backend, mobile, and systems — from React to C++ to Flutter.",
+      "desc_ar": "إلمام بالواجهة الأمامية والخوادم والجوال والأنظمة من React إلى C++ وFlutter.",
+      "badge_en": "Full Stack",
+      "badge_ar": "متكامل",
+      "accent": "192 100% 52%"
+    },
+    {
+      "id": "ach-5",
+      "icon": "layers",
+      "title_en": "22 Skills Mastered",
+      "title_ar": "٢٢ مهارة مُتقنة",
+      "desc_en": "Spanning languages, frameworks, tools, databases, and platforms — constantly expanding the technical toolkit.",
+      "desc_ar": "تمتد عبر اللغات والأطر والأدوات وقواعد البيانات والمنصات مع توسع مستمر في الأدوات التقنية.",
+      "badge_en": "Versatile",
+      "badge_ar": "متعدد الجوانب",
+      "accent": "38 95% 55%"
+    },
+    {
+      "id": "ach-6",
+      "icon": "clock",
+      "title_en": "7+ Years Building",
+      "title_ar": "أكثر من ٧ سنوات بناء",
+      "desc_en": "Started coding in middle school in 2019. Now building full-stack software and contributing to open source.",
+      "desc_ar": "بدأت البرمجة في المرحلة الإعدادية عام ٢٠١٩. الآن أبني برمجيات متكاملة وأساهم في المصدر المفتوح.",
+      "badge_en": "Journey",
+      "badge_ar": "المسيرة",
+      "accent": "328 80% 60%"
+    }
+  ],
+
+  "hero": {
+    "words_en": ["Engineer.", "Builder.", "Bilingual."],
+    "words_ar": ["مهندس.", "صانع.", "ثنائي اللغة."]
+  },
+
+  "navigation": {
+    "showComments": true,
+    "contactLabelEn": "Contact",
+    "contactLabelAr": "تواصل"
+  }
+}

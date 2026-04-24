@@ -1,0 +1,537 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Alternating section bands — cycle white / black / primary across the page.
+     The actual values flip in .dark via the tokens below, so light↔dark swaps
+     automatically while primary stays as the brand accent. */
+  --color-band-light: var(--band-light);
+  --color-band-light-foreground: var(--band-light-foreground);
+  --color-band-dark: var(--band-dark);
+  --color-band-dark-foreground: var(--band-dark-foreground);
+  --color-band-primary: var(--band-primary);
+  --color-band-primary-foreground: var(--band-primary-foreground);
+  /* Extended band tokens for layered depth across the page */
+  --color-band-surface: var(--band-surface);
+  --color-band-surface-foreground: var(--band-surface-foreground);
+  --color-band-soft: var(--band-soft);
+  --color-band-soft-foreground: var(--band-soft-foreground);
+  /* Surface tokens — layered depth scale for cards/elevated panels */
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-hairline: var(--hairline);
+}
+
+:root {
+  --radius: 0.625rem;
+  /* ============================================================
+     LIGHT MODE — clean, paper-white, professional
+     Backgrounds: pure paper → soft gray surfaces
+     Text: deep near-black with subtle indigo undertone
+     ============================================================ */
+  --background: oklch(0.99 0.002 255);
+  --foreground: oklch(0.16 0.018 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.018 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.018 260);
+  /* BRAND IDENTITY — fixed across both themes (do NOT change in .dark) */
+  --primary: oklch(0.55 0.22 268);
+  --primary-foreground: oklch(0.99 0.005 240);
+  --primary-soft: oklch(0.93 0.05 265);
+  --primary-deep: oklch(0.38 0.2 268);
+  --primary-glow: oklch(0.66 0.22 268);
+  --secondary: oklch(0.97 0.005 255);
+  --secondary-foreground: oklch(0.2 0.025 260);
+  --muted: oklch(0.97 0.005 255);
+  --muted-foreground: oklch(0.5 0.018 258);
+  --accent: oklch(0.94 0.025 265);
+  --accent-foreground: oklch(0.2 0.04 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.92 0.008 258);
+  --input: oklch(0.92 0.008 258);
+  --ring: oklch(0.55 0.22 268);
+  /* Layered surfaces (light mode) */
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.978 0.004 255);
+  --surface-3: oklch(0.96 0.006 258);
+  --hairline: oklch(0.9 0.008 258);
+  --pill-1: oklch(0.86 0.09 240);
+  --pill-2: oklch(0.5 0.22 265);
+  --pill-3: oklch(0.36 0.2 265);
+  --pill-4: oklch(0.78 0.12 270);
+  --pill-5: oklch(0.62 0.2 258);
+  --pill-6: oklch(0.93 0.04 255);
+  /* Alternating section bands (light mode) */
+  --band-light: oklch(0.985 0.004 255);
+  --band-light-foreground: oklch(0.145 0.025 260);
+  --band-dark: oklch(0.105 0.022 268);
+  --band-dark-foreground: oklch(0.985 0.004 255);
+  --band-primary: oklch(0.42 0.22 268);
+  --band-primary-foreground: oklch(0.99 0.005 240);
+  /* Light-mode extended bands: warm paper → cool surface → indigo wash */
+  --band-surface: oklch(0.97 0.006 258);
+  --band-surface-foreground: oklch(0.16 0.025 260);
+  --band-soft: oklch(0.95 0.025 265);
+  --band-soft-foreground: oklch(0.18 0.04 265);
+  --gradient-hero: radial-gradient(ellipse at top, oklch(0.95 0.05 268 / 0.5), transparent 60%);
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-glow) 100%);
+  --gradient-mesh: radial-gradient(at 20% 20%, oklch(0.92 0.06 268 / 0.4) 0px, transparent 50%),
+                   radial-gradient(at 80% 0%, oklch(0.88 0.08 240 / 0.35) 0px, transparent 50%),
+                   radial-gradient(at 0% 80%, oklch(0.9 0.06 280 / 0.3) 0px, transparent 50%);
+  --shadow-pill: 0 10px 30px -10px oklch(0.4 0.18 268 / 0.35);
+  --shadow-soft: 0 20px 60px -20px oklch(0.4 0.15 268 / 0.18);
+  --shadow-elevated: 0 30px 80px -30px oklch(0.3 0.18 268 / 0.28), 0 8px 24px -8px oklch(0.3 0.18 268 / 0.12);
+  --shadow-glow: 0 0 0 1px oklch(0.48 0.22 268 / 0.15), 0 20px 60px -20px oklch(0.48 0.22 268 / 0.45);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+.dark {
+  /* ============================================================
+     DARK MODE — refined near-black, easy on the eyes
+     Backgrounds: deep charcoal-black with very subtle indigo tint
+     Surfaces: layered gray-black for depth (no pure #000)
+     Text: warm off-white, high contrast but not harsh
+     ============================================================ */
+  --background: oklch(0.13 0.006 268);
+  --foreground: oklch(0.97 0.003 255);
+  --card: oklch(0.17 0.008 268);
+  --card-foreground: oklch(0.97 0.003 255);
+  --popover: oklch(0.17 0.008 268);
+  --popover-foreground: oklch(0.97 0.003 255);
+  /* BRAND IDENTITY — IDENTICAL to light mode. The fixed visual anchor. */
+  --primary: oklch(0.55 0.22 268);
+  --primary-foreground: oklch(0.99 0.005 240);
+  --primary-soft: oklch(0.28 0.14 268);
+  --primary-deep: oklch(0.42 0.22 268);
+  --primary-glow: oklch(0.66 0.22 268);
+  --secondary: oklch(0.21 0.01 268);
+  --secondary-foreground: oklch(0.97 0.003 255);
+  --muted: oklch(0.21 0.01 268);
+  --muted-foreground: oklch(0.7 0.012 258);
+  --accent: oklch(0.24 0.025 268);
+  --accent-foreground: oklch(0.97 0.003 255);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.55 0.22 268);
+  /* Layered surfaces (dark mode) — progressive elevation */
+  --surface-1: oklch(0.17 0.008 268);
+  --surface-2: oklch(0.2 0.01 268);
+  --surface-3: oklch(0.24 0.012 268);
+  --hairline: oklch(1 0 0 / 7%);
+  /* Inverted bands for dark mode: "light" becomes the dark surface, "dark" becomes light, primary stays the brand. */
+  --band-light: oklch(0.13 0.006 268);
+  --band-light-foreground: oklch(0.97 0.003 255);
+  --band-dark: oklch(0.97 0.003 255);
+  --band-dark-foreground: oklch(0.13 0.006 268);
+  --band-primary: oklch(0.55 0.22 268);
+  --band-primary-foreground: oklch(0.99 0.005 240);
+  /* Dark-mode extended bands */
+  --band-surface: oklch(0.155 0.008 268);
+  --band-surface-foreground: oklch(0.97 0.003 255);
+  --band-soft: oklch(0.2 0.018 268);
+  --band-soft-foreground: oklch(0.97 0.003 255);
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-glow) 100%);
+  --gradient-mesh: radial-gradient(at 20% 20%, oklch(0.32 0.18 268 / 0.5) 0px, transparent 50%),
+                   radial-gradient(at 80% 0%, oklch(0.28 0.16 240 / 0.4) 0px, transparent 50%),
+                   radial-gradient(at 0% 80%, oklch(0.3 0.16 280 / 0.35) 0px, transparent 50%);
+  --shadow-elevated: 0 30px 80px -30px oklch(0 0 0 / 0.65), 0 8px 24px -8px oklch(0 0 0 / 0.45);
+  --shadow-glow: 0 0 0 1px oklch(0.55 0.22 268 / 0.22), 0 20px 60px -20px oklch(0.55 0.22 268 / 0.45);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: "Inter", "Helvetica Neue", system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Theme transition (fallback for browsers without
+     View Transitions API). Uses a single, well-eased global transition
+     covering all theme-affected properties. The class is added briefly
+     by ThemeProvider only when the cinematic VT path is unavailable. */
+  html.theme-anim,
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after {
+    transition:
+      background-color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-image 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      fill 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      stroke 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      backdrop-filter 520ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+    transition-delay: 0ms !important;
+  }
+  /* Don't fight user-driven transforms/animations during theme swap. */
+  html.theme-anim *:hover,
+  html.theme-anim [data-state="open"],
+  html.theme-anim [data-state="closed"] {
+    transition-property: background-color, color, border-color, box-shadow, fill, stroke !important;
+  }
+
+  /* ---------- View Transitions: cinematic circular reveal.
+     The new theme is clip-path animated in JS (ThemeProvider). Here we
+     just disable the default crossfade and stack the layers cleanly. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(root) {
+    z-index: 1;
+  }
+  ::view-transition-new(root) {
+    z-index: 2;
+  }
+  /* Going to dark: the dark layer should sit on top (default). Going
+     to light: also sit on top — JS animates the clip-path either way. */
+
+  .font-display {
+    font-family: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+    letter-spacing: -0.04em;
+    font-weight: 600;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+@layer utilities {
+  .pill-shadow {
+    box-shadow: var(--shadow-pill);
+  }
+  .soft-shadow {
+    box-shadow: var(--shadow-soft);
+  }
+  .marquee {
+    /* Long duration so the wrap-around is imperceptible even on wide
+       screens. Track is repeated 6× in JSX; -50% loop = 3 copies → 3 copies,
+       perfectly seamless. */
+    animation: marquee 90s linear infinite;
+    will-change: transform;
+  }
+  .marquee-rtl {
+    animation-direction: reverse;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(2deg); }
+  }
+  .animate-float-slow {
+    animation: float-slow 8s ease-in-out infinite;
+  }
+  @keyframes blob {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -50px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
+  }
+  .animate-blob {
+    animation: blob 18s ease-in-out infinite;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .hover-lift {
+    transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), box-shadow 0.4s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px -28px oklch(0.4 0.18 255 / 0.35);
+  }
+  .glow-shadow {
+    box-shadow: 0 30px 80px -40px oklch(0.55 0.22 255 / 0.55);
+  }
+  .elevated-shadow { box-shadow: var(--shadow-elevated); }
+  .primary-glow-shadow { box-shadow: var(--shadow-glow); }
+  .mesh-bg { background-image: var(--gradient-mesh); }
+  .gradient-primary-bg { background-image: var(--gradient-primary); }
+  .gradient-text-primary {
+    background-image: linear-gradient(135deg, var(--primary), var(--primary-glow));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hairline { border-color: var(--hairline); }
+  .surface-1 { background-color: var(--surface-1); }
+  .surface-2 { background-color: var(--surface-2); }
+  .surface-3 { background-color: var(--surface-3); }
+  /* Subtle grid pattern for premium section backgrounds */
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, currentColor 6%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, currentColor 6%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+  }
+  .grid-bg-fine {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, currentColor 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, currentColor 4%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  /* Premium dotted grid for elevated bands */
+  .grid-bg-dots {
+    background-image: radial-gradient(
+      color-mix(in oklab, currentColor 14%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+    mask-image: radial-gradient(ellipse at center, black 50%, transparent 85%);
+  }
+  /* Soft aurora wash — used behind feature sections */
+  .aurora-bg {
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 0%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 60%),
+      radial-gradient(ellipse 70% 60% at 90% 100%, color-mix(in oklab, var(--primary-glow) 14%, transparent), transparent 60%);
+  }
+  /* Noise overlay for refined depth */
+  .noise-overlay {
+    position: relative;
+  }
+  .noise-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* Section divider — subtle hairline with gradient fade */
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, color-mix(in oklab, currentColor 18%, transparent), transparent);
+  }
+  /* Eyebrow chip */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.8rem;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+    background: color-mix(in oklab, currentColor 4%, transparent);
+  }
+  .eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--primary);
+    box-shadow: 0 0 12px var(--primary);
+  }
+  .comments-spotlight {
+    background:
+      radial-gradient(
+        600px circle at var(--mx, 50%) var(--my, 30%),
+        oklch(0.55 0.22 255 / 0.10),
+        transparent 60%
+      );
+    transition: background 80ms linear;
+  }
+  .comment-card-enter {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .comment-card-enter.is-in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 oklch(0.55 0.22 255 / 0.45); }
+    70%  { box-shadow: 0 0 0 18px oklch(0.55 0.22 255 / 0); }
+    100% { box-shadow: 0 0 0 0 oklch(0.55 0.22 255 / 0); }
+  }
+  .pulse-ring {
+    animation: pulse-ring 1.6s ease-out 1;
+  }
+  [dir="rtl"] .marquee { animation-direction: reverse; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-blob, .marquee, .pulse-ring, .animate-float-slow { animation: none !important; }
+  }
+
+  /* ---------- Skeleton loading: shimmer + graceful fade ---------- */
+  @keyframes skeleton-shimmer {
+    0%   { background-position: -160% 0; }
+    100% { background-position: 160% 0; }
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.72; }
+  }
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+    background-image: linear-gradient(
+      105deg,
+      transparent 30%,
+      color-mix(in oklab, var(--foreground) 9%, transparent) 50%,
+      transparent 70%
+    );
+    background-size: 280% 100%;
+    background-repeat: no-repeat;
+    background-position: -160% 0;
+    animation:
+      skeleton-shimmer 2.4s cubic-bezier(0.45, 0, 0.25, 1) infinite,
+      skeleton-pulse 3s ease-in-out infinite;
+    will-change: background-position, opacity;
+  }
+  /* Container that swaps skeleton -> content. The skeleton dissolves
+     while real content rises in, with no layout jump. */
+  .skeleton-wrap {
+    position: relative;
+  }
+  .skeleton-fade-out {
+    animation: skeleton-dissolve 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    pointer-events: none;
+  }
+  @keyframes skeleton-dissolve {
+    0%   { opacity: 1; filter: blur(0); }
+    100% { opacity: 0; filter: blur(4px); transform: scale(0.985); }
+  }
+  .skeleton-content-in {
+    animation: skeleton-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes skeleton-rise {
+    0%   { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+    60%  { filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+  /* Inline pulse-dots used inside buttons in place of spinning loaders. */
+  .dot-pulse {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .dot-pulse > span {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.55;
+    animation: dot-pulse-bounce 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .dot-pulse > span:nth-child(2) { animation-delay: 0.18s; }
+  .dot-pulse > span:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes dot-pulse-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+    40%           { transform: translateY(-3px); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none !important; }
+    .skeleton-fade-out, .skeleton-content-in { animation: none !important; }
+    .dot-pulse > span { animation: none !important; opacity: 0.7 !important; }
+  }
+
+}
