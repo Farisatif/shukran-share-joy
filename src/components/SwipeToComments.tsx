@@ -6,20 +6,20 @@ import { useLang } from "./LanguageProvider";
 import { useSiteData } from "./SiteDataProvider";
 
 /**
- * PageTransitionLayer — WhatsApp-style sibling navigation between
+ * SwipeToComments — WhatsApp-style sibling navigation between
  * `/` (home) and `/comments` (chat).
  *
  * Behavior:
- *  - Horizontal swipe anywhere on the page navigates between the two routes.
- *    LTR: swipe LEFT → /comments, swipe RIGHT → /
- *    RTL: mirrored.
- *  - A subtle floating "tab" on the active edge always hints the affordance.
- *  - During a route change the outgoing page slides out and the incoming
- *    page slides in from the opposite side (springy, 360–480ms).
- *  - Vertical scroll is preserved: we lock direction within the first 10px
- *    so vertical scrolling never triggers navigation.
- *  - Hidden when the user is interacting with form fields, buttons, or
- *    actively dragging inside scrollable containers.
+ *  - Horizontal swipe anywhere navigates between the two routes.
+ *    LTR: swipe LEFT → /comments, swipe RIGHT → /. RTL is mirrored.
+ *  - Direction lock: vertical scroll always wins until 12px of net horizontal
+ *    travel beats vertical travel by 1.5x. Prevents accidental nav while
+ *    scrolling the page.
+ *  - Edge handle on desktop, thin tab on mobile, both for discoverability.
+ *  - Keyboard: ← / → (mirrored in RTL) navigate between siblings.
+ *  - Ignores swipes that originate inside form fields, canvases, anything
+ *    marked `data-no-swipe`, or inside an element that is itself horizontally
+ *    scrollable (carousels etc.).
  */
 
 const ROUTES = ["/", "/comments"] as const;
@@ -46,35 +46,87 @@ export function SwipeToComments() {
   const active = useRef(false);
   const locked = useRef<"h" | "v" | null>(null);
 
+  // Direction that takes you to the OTHER page.
+  // LTR + on /  → swipe LEFT  (negative dx)  → /comments  (sign = -1)
+  // LTR + on /comments → swipe RIGHT (positive dx) → /     (sign = +1)
+  // RTL is mirrored.
+  const desiredSign = (() => {
+    if (idx === 0) return isRtl ? +1 : -1;
+    return isRtl ? -1 : +1;
+  })();
+
+  // Keyboard nav (← / → arrows, mirrored in RTL).
+  useEffect(() => {
+    if (!showComments) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Don't hijack typing.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key;
+      if (key !== "ArrowLeft" && key !== "ArrowRight") return;
+      const wantsOther =
+        idx === 0
+          ? (isRtl ? key === "ArrowRight" : key === "ArrowLeft")
+          : (isRtl ? key === "ArrowLeft" : key === "ArrowRight");
+      if (wantsOther) {
+        e.preventDefault();
+        navigate({ to: otherPath });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [idx, isRtl, navigate, otherPath, showComments]);
+
+  // Pointer-driven swipe.
   useEffect(() => {
     if (!showComments) return;
 
-    const THRESHOLD = 0.28; // 28% of width
-    const FLICK_VEL = 0.85;
-    const FLICK_MIN = 60;
+    const THRESHOLD = 0.25; // 25% of width commits the navigation
+    const FLICK_VEL = 0.7; // px/ms
+    const FLICK_MIN = 50; // px
 
-    // Determine the direction that takes you to the OTHER page.
-    // LTR + on /  → swipe LEFT  (negative dx)  → /comments
-    // LTR + on /comments → swipe RIGHT (positive dx) → /
-    // RTL is mirrored.
-    const desiredSign = (() => {
-      if (idx === 0) return isRtl ? +1 : -1; // home → comments
-      return isRtl ? -1 : +1; // comments → home
-    })();
-
-    const isInteractive = (el: EventTarget | null) => {
+    const isInteractive = (el: EventTarget | null): boolean => {
       if (!(el instanceof Element)) return false;
-      const closest = el.closest(
-        'input,textarea,select,button,a,[role="button"],[contenteditable="true"],[data-no-swipe="true"],canvas,.no-swipe',
-      );
-      // We DO want to start swipe even on links/buttons most of the time,
-      // but never inside text inputs or canvases (drawing surfaces).
-      if (!closest) return false;
-      const tag = closest.tagName.toLowerCase();
-      return tag === "input" || tag === "textarea" || tag === "select" || tag === "canvas" || closest.getAttribute("contenteditable") === "true" || closest.hasAttribute("data-no-swipe");
+      // Walk up looking for opt-out / form / scrollable-x containers.
+      let node: Element | null = el;
+      while (node && node !== document.body) {
+        if (node.hasAttribute("data-no-swipe")) return true;
+        const tag = node.tagName.toLowerCase();
+        if (
+          tag === "input" ||
+          tag === "textarea" ||
+          tag === "select" ||
+          tag === "canvas"
+        ) {
+          return true;
+        }
+        if ((node as HTMLElement).isContentEditable) return true;
+        // Horizontally scrollable container — let it own horizontal gestures.
+        const style = window.getComputedStyle(node);
+        const overflowX = style.overflowX;
+        if (
+          (overflowX === "auto" || overflowX === "scroll") &&
+          (node as HTMLElement).scrollWidth > (node as HTMLElement).clientWidth + 1
+        ) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    const reset = () => {
+      active.current = false;
+      locked.current = null;
+      setDragging(false);
+      setProgress(0);
     };
 
     const onStart = (e: PointerEvent) => {
+      // Only primary pointer; ignore right/middle clicks.
       if (e.pointerType === "mouse" && e.button !== 0) return;
       if (isInteractive(e.target)) return;
       startX.current = e.clientX;
@@ -90,18 +142,20 @@ export function SwipeToComments() {
       const dy = e.clientY - startY.current;
 
       if (locked.current === null) {
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-        locked.current = Math.abs(dx) > Math.abs(dy) * 1.2 ? "h" : "v";
-        if (locked.current === "v") {
+        // Wait for a clear directional intent (12px) and require horizontal
+        // travel to dominate vertical by 1.5x. Otherwise yield to scroll.
+        if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+        if (Math.abs(dx) > Math.abs(dy) * 1.5) {
+          locked.current = "h";
+          setDragging(true);
+        } else {
+          locked.current = "v";
           active.current = false;
-          setDragging(false);
-          setProgress(0);
           return;
         }
-        setDragging(true);
       }
 
-      // Project onto desired direction
+      // Project onto desired direction; ignore wrong-way drags.
       const travel = dx * desiredSign;
       if (travel <= 0) {
         setProgress(0);
@@ -113,9 +167,8 @@ export function SwipeToComments() {
     };
 
     const finish = (e?: PointerEvent) => {
-      if (!active.current) {
-        setDragging(false);
-        setProgress(0);
+      if (!active.current && locked.current !== "h") {
+        reset();
         return;
       }
       const dx = e ? e.clientX - startX.current : 0;
@@ -126,33 +179,25 @@ export function SwipeToComments() {
       const committed =
         travel >= w * THRESHOLD || (vel >= FLICK_VEL && travel >= FLICK_MIN);
 
-      active.current = false;
-      locked.current = null;
-
-      if (committed) {
-        navigate({ to: otherPath });
-      }
-      setDragging(false);
-      setProgress(0);
+      reset();
+      if (committed) navigate({ to: otherPath });
     };
 
     window.addEventListener("pointerdown", onStart, { passive: true });
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish, { passive: true });
-    window.addEventListener("pointercancel", () => finish(), { passive: true });
+    window.addEventListener("pointercancel", () => reset(), { passive: true });
 
     return () => {
       window.removeEventListener("pointerdown", onStart);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
     };
-  }, [idx, isRtl, navigate, otherPath, showComments]);
+  }, [desiredSign, navigate, otherPath, showComments]);
 
   if (!showComments) return null;
 
   // Edge handle is mirrored based on which page we're on.
-  // On home: handle on the right edge (LTR) showing "Comments →".
-  // On comments: handle on the left edge (LTR) showing "← Back".
   const handleOnRight = idx === 0 ? !isRtl : isRtl;
   const edgeClass = handleOnRight ? "right-0" : "left-0";
   const Arrow = handleOnRight ? ChevronLeft : ChevronRight;
@@ -161,19 +206,14 @@ export function SwipeToComments() {
 
   return (
     <>
-      {/* Floating edge handle — discoverable affordance */}
+      {/* Floating edge handle — discoverable affordance (desktop) */}
       <motion.button
         type="button"
         aria-label={handleLabel}
         onClick={() => navigate({ to: otherPath })}
         initial={{ opacity: 0, x: handleOnRight ? 16 : -16 }}
-        animate={{
-          opacity: dragging ? 0 : 1,
-          x: 0,
-        }}
-        transition={{
-          opacity: { duration: 0.4, delay: 0.6 },
-        }}
+        animate={{ opacity: dragging ? 0 : 1, x: 0 }}
+        transition={{ opacity: { duration: 0.4, delay: 0.6 } }}
         data-no-swipe="true"
         className={`fixed top-1/2 -translate-y-1/2 ${edgeClass} z-40 hidden md:flex items-center gap-2 ${handleOnRight ? "rounded-l-full pl-3 pr-2.5 border-r-0" : "rounded-r-full pr-3 pl-2.5 border-l-0"} bg-card/85 backdrop-blur-xl border border-border py-2.5 soft-shadow text-foreground/85 hover:text-foreground hover:bg-card transition-colors group`}
       >
@@ -212,7 +252,7 @@ export function SwipeToComments() {
         className={`fixed top-1/2 -translate-y-1/2 ${edgeClass} z-40 md:hidden h-16 w-1.5 ${handleOnRight ? "rounded-l-full" : "rounded-r-full"} bg-primary/70`}
       />
 
-      {/* Drag progress reveal — sliding panel that previews the other page */}
+      {/* Drag progress reveal */}
       <AnimatePresence>
         {dragging && Math.abs(progress) > 0.02 && (
           <motion.div
