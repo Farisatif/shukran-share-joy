@@ -236,7 +236,11 @@
     font-family: "Inter", "Helvetica Neue", system-ui, -apple-system, sans-serif;
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    overflow-x: clip;
+    /* Let the browser handle vertical scroll natively; our swipe handler
+       only consumes horizontal gestures after a strict direction lock. */
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
   }
 
   /* ---------- Theme transition (fallback for browsers without
