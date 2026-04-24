@@ -431,16 +431,24 @@ export function Pager() {
       <Navbar />
 
       {/* The horizontal track — both pages mounted, side-by-side. */}
-      <div className="relative w-full overflow-x-clip">
+      <div className="relative w-full overflow-x-clip" style={{ perspective: "1600px" }}>
         <div
           ref={trackRef}
           className={`flex w-[200vw] ${isRtl ? "flex-row-reverse" : "flex-row"} will-change-transform`}
           style={{ transform: "translate3d(0,0,0)", backfaceVisibility: "hidden" }}
         >
-          <div ref={homeRef} className="w-screen shrink-0">
+          <div
+            ref={homeRef}
+            className="w-screen shrink-0 will-change-transform"
+            style={{ transformOrigin: isRtl ? "left center" : "right center", backfaceVisibility: "hidden" }}
+          >
             <HomePage />
           </div>
-          <div ref={commentsRef} className="w-screen shrink-0">
+          <div
+            ref={commentsRef}
+            className="w-screen shrink-0 will-change-transform"
+            style={{ transformOrigin: isRtl ? "right center" : "left center", backfaceVisibility: "hidden" }}
+          >
             <CommentsPage />
           </div>
         </div>
