@@ -79,7 +79,10 @@ export function Pager() {
     }
   }, [activeIdx, idxMV]);
 
-  // Apply translation via CSS variable on the track. Compositor-only.
+  // Apply translation + per-page depth transforms. Compositor-only, no layout.
+  // The track translates the full distance; each page additionally gets a small
+  // counter-parallax + scale + opacity based on its distance from "centered",
+  // producing an iOS/visionOS-style depth feel without ever revealing the seam.
   useLayoutEffect(() => {
     const apply = (i: number) => {
       const w = widthRef.current || window.innerWidth;
@@ -89,6 +92,27 @@ export function Pager() {
       if (trackRef.current) {
         trackRef.current.style.transform = `translate3d(${tx}px, 0, 0)`;
       }
+      // Per-page depth: distance in [0..1] from each page's "centered" state.
+      // Home is centered at i=0, Comments at i=1.
+      const dHome = Math.min(1, Math.max(0, Math.abs(i)));         // 0 when home is active
+      const dComm = Math.min(1, Math.max(0, Math.abs(1 - i)));     // 0 when comments active
+      // Subtle: max 4% scale-down, max 35% opacity dim, slight inward parallax (8% of width).
+      const setDepth = (el: HTMLDivElement | null, d: number, dir: -1 | 1) => {
+        if (!el) return;
+        const scale = 1 - d * 0.04;
+        const opacity = 1 - d * 0.35;
+        const px = dir * d * w * 0.08; // counter-parallax in screen px
+        el.style.transform = `translate3d(${px}px, 0, 0) scale(${scale})`;
+        el.style.opacity = String(opacity);
+        el.style.filter = d > 0.001 ? `blur(${(d * 1.2).toFixed(2)}px)` : "none";
+      };
+      // Outgoing page parallaxes inward (toward the side it came from).
+      // In LTR: home parallaxes RIGHT (+) when leaving; comments parallaxes LEFT (-).
+      // RTL flips the directions.
+      const homeDir = (isRtl ? -1 : +1) as -1 | 1;
+      const commDir = (isRtl ? +1 : -1) as -1 | 1;
+      setDepth(homeRef.current, dHome, homeDir);
+      setDepth(commentsRef.current, dComm, commDir);
     };
     apply(idxMV.get());
     const unsub = idxMV.on("change", apply);
