@@ -71,15 +71,18 @@ export function Pager() {
     if (Math.abs(current - activeIdx) > 0.001) {
       animate(idxMV, activeIdx, {
         type: "spring",
-        stiffness: 500,
-        damping: 44,
-        mass: 0.85,
+        stiffness: 320,
+        damping: 38,
+        mass: 1.05,
         restDelta: 0.001,
       });
     }
   }, [activeIdx, idxMV]);
 
-  // Apply translation via CSS variable on the track. Compositor-only.
+  // Apply translation + per-page depth transforms. Compositor-only, no layout.
+  // The track translates the full distance; each page additionally gets a small
+  // counter-parallax + scale + opacity based on its distance from "centered",
+  // producing an iOS/visionOS-style depth feel without ever revealing the seam.
   useLayoutEffect(() => {
     const apply = (i: number) => {
       const w = widthRef.current || window.innerWidth;
@@ -89,6 +92,27 @@ export function Pager() {
       if (trackRef.current) {
         trackRef.current.style.transform = `translate3d(${tx}px, 0, 0)`;
       }
+      // Per-page depth: distance in [0..1] from each page's "centered" state.
+      // Home is centered at i=0, Comments at i=1.
+      const dHome = Math.min(1, Math.max(0, Math.abs(i)));         // 0 when home is active
+      const dComm = Math.min(1, Math.max(0, Math.abs(1 - i)));     // 0 when comments active
+      // Subtle: max 4% scale-down, max 35% opacity dim, slight inward parallax (8% of width).
+      const setDepth = (el: HTMLDivElement | null, d: number, dir: -1 | 1) => {
+        if (!el) return;
+        const scale = 1 - d * 0.04;
+        const opacity = 1 - d * 0.35;
+        const px = dir * d * w * 0.08; // counter-parallax in screen px
+        el.style.transform = `translate3d(${px}px, 0, 0) scale(${scale})`;
+        el.style.opacity = String(opacity);
+        el.style.filter = d > 0.001 ? `blur(${(d * 1.2).toFixed(2)}px)` : "none";
+      };
+      // Outgoing page parallaxes inward (toward the side it came from).
+      // In LTR: home parallaxes RIGHT (+) when leaving; comments parallaxes LEFT (-).
+      // RTL flips the directions.
+      const homeDir = (isRtl ? -1 : +1) as -1 | 1;
+      const commDir = (isRtl ? +1 : -1) as -1 | 1;
+      setDepth(homeRef.current, dHome, homeDir);
+      setDepth(commentsRef.current, dComm, commDir);
     };
     apply(idxMV.get());
     const unsub = idxMV.on("change", apply);
@@ -307,9 +331,9 @@ export function Pager() {
 
       animate(idxMV, target, {
         type: "spring",
-        stiffness: 520,
-        damping: 46,
-        mass: 0.8,
+        stiffness: 340,
+        damping: 40,
+        mass: 1.0,
         velocity: handoffVel,
         restDelta: 0.001,
         onComplete: () => {
@@ -349,9 +373,9 @@ export function Pager() {
       scrollMemory.current[path] = window.scrollY;
       animate(idxMV, next, {
         type: "spring",
-        stiffness: 520,
-        damping: 46,
-        mass: 0.8,
+        stiffness: 340,
+        damping: 40,
+        mass: 1.0,
         restDelta: 0.001,
         onComplete: () => {
           setUrlSilently(next);
@@ -389,9 +413,9 @@ export function Pager() {
     scrollMemory.current[path] = window.scrollY;
     animate(idxMV, next, {
       type: "spring",
-      stiffness: 520,
-      damping: 46,
-      mass: 0.8,
+      stiffness: 340,
+      damping: 40,
+      mass: 1.0,
       restDelta: 0.001,
       onComplete: () => {
         setUrlSilently(next);
@@ -407,16 +431,24 @@ export function Pager() {
       <Navbar />
 
       {/* The horizontal track — both pages mounted, side-by-side. */}
-      <div className="relative w-full overflow-x-clip">
+      <div className="relative w-full overflow-x-clip" style={{ perspective: "1600px" }}>
         <div
           ref={trackRef}
           className={`flex w-[200vw] ${isRtl ? "flex-row-reverse" : "flex-row"} will-change-transform`}
           style={{ transform: "translate3d(0,0,0)", backfaceVisibility: "hidden" }}
         >
-          <div ref={homeRef} className="w-screen shrink-0">
+          <div
+            ref={homeRef}
+            className="w-screen shrink-0 will-change-transform"
+            style={{ transformOrigin: isRtl ? "left center" : "right center", backfaceVisibility: "hidden" }}
+          >
             <HomePage />
           </div>
-          <div ref={commentsRef} className="w-screen shrink-0">
+          <div
+            ref={commentsRef}
+            className="w-screen shrink-0 will-change-transform"
+            style={{ transformOrigin: isRtl ? "right center" : "left center", backfaceVisibility: "hidden" }}
+          >
             <CommentsPage />
           </div>
         </div>
