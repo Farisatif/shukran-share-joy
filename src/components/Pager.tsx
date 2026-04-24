@@ -71,9 +71,9 @@ export function Pager() {
     if (Math.abs(current - activeIdx) > 0.001) {
       animate(idxMV, activeIdx, {
         type: "spring",
-        stiffness: 500,
-        damping: 44,
-        mass: 0.85,
+        stiffness: 320,
+        damping: 38,
+        mass: 1.05,
         restDelta: 0.001,
       });
     }
@@ -331,9 +331,9 @@ export function Pager() {
 
       animate(idxMV, target, {
         type: "spring",
-        stiffness: 520,
-        damping: 46,
-        mass: 0.8,
+        stiffness: 340,
+        damping: 40,
+        mass: 1.0,
         velocity: handoffVel,
         restDelta: 0.001,
         onComplete: () => {
@@ -373,9 +373,9 @@ export function Pager() {
       scrollMemory.current[path] = window.scrollY;
       animate(idxMV, next, {
         type: "spring",
-        stiffness: 520,
-        damping: 46,
-        mass: 0.8,
+        stiffness: 340,
+        damping: 40,
+        mass: 1.0,
         restDelta: 0.001,
         onComplete: () => {
           setUrlSilently(next);
@@ -413,9 +413,9 @@ export function Pager() {
     scrollMemory.current[path] = window.scrollY;
     animate(idxMV, next, {
       type: "spring",
-      stiffness: 520,
-      damping: 46,
-      mass: 0.8,
+      stiffness: 340,
+      damping: 40,
+      mass: 1.0,
       restDelta: 0.001,
       onComplete: () => {
         setUrlSilently(next);
