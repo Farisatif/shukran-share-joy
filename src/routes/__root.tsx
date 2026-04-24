@@ -6,8 +6,6 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { SiteDataProvider } from "@/components/SiteDataProvider";
 import { KitsysArrowField } from "@/components/KitsysArrowField";
-import { SwipeToComments } from "@/components/SwipeToComments";
-import { PageTransition } from "@/components/PageTransition";
 
 function NotFoundComponent() {
   return (
@@ -87,10 +85,7 @@ function RootComponent() {
       <LanguageProvider>
         <SiteDataProvider>
           <KitsysArrowField mode="fixed" className="chevron-canvas z-0" />
-          <PageTransition>
-            <Outlet />
-          </PageTransition>
-          <SwipeToComments />
+          <Outlet />
           <Toaster position="bottom-right" />
         </SiteDataProvider>
       </LanguageProvider>
