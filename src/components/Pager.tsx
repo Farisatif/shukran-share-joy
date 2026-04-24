@@ -6,6 +6,8 @@ import { useLang } from "./LanguageProvider";
 import { useSiteData } from "./SiteDataProvider";
 import { HomePage } from "./HomePage";
 import { CommentsPage } from "./CommentsPage";
+import { Navbar } from "./Navbar";
+import { ScrollProgress } from "./motion-primitives";
 
 /**
  * Pager — both /  and /comments are mounted side-by-side at all times in a
@@ -363,7 +365,13 @@ export function Pager() {
 
   // If comments are hidden, render just the active page without pager.
   if (!showComments) {
-    return activeIdx === 1 ? <CommentsPage /> : <HomePage />;
+    return (
+      <>
+        <ScrollProgress />
+        <Navbar />
+        {activeIdx === 1 ? <CommentsPage /> : <HomePage />}
+      </>
+    );
   }
 
   // Edge affordance — points to the OTHER page.
@@ -394,6 +402,10 @@ export function Pager() {
 
   return (
     <>
+      {/* Fixed UI that lives ABOVE the sliding track — never moves with the swipe. */}
+      <ScrollProgress />
+      <Navbar />
+
       {/* The horizontal track — both pages mounted, side-by-side. */}
       <div className="relative w-full overflow-x-clip">
         <div

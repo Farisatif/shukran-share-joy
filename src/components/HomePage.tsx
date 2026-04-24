@@ -1,4 +1,3 @@
-import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { Marquee } from "@/components/Marquee";
 import { AboutSection } from "@/components/AboutSection";
@@ -11,7 +10,6 @@ import { GithubActivitySection } from "@/components/GithubActivitySection";
 import { SectionBand } from "@/components/SectionBand";
 import { useSiteData } from "@/components/SiteDataProvider";
 import { useLang } from "@/components/LanguageProvider";
-import { ScrollProgress } from "@/components/motion-primitives";
 
 export function HomePage() {
   const { data } = useSiteData();
@@ -20,8 +18,6 @@ export function HomePage() {
   const tagsAr = data.personal.ar.taglines;
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <ScrollProgress />
-      <Navbar />
       <Hero />
       <Marquee items={tagsEn} itemsAr={tagsAr} key={lang} />
       <SectionBand variant="light" pattern="none" divider roundBottom>

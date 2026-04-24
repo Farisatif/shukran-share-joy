@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
 import { Comments } from "@/components/Comments";
 import { Reveal } from "@/components/Reveal";
 import { useLang } from "@/components/LanguageProvider";
@@ -34,7 +33,6 @@ export function CommentsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
       <section className="pt-32 pb-24 sm:pt-40 sm:pb-32 relative overflow-hidden">
         <div ref={blob1} className="pointer-events-none absolute -top-40 -left-40 h-[460px] w-[460px] rounded-full bg-[oklch(0.85_0.1_240)] opacity-50 blur-3xl animate-blob" />
         <div ref={blob2} className="pointer-events-none absolute bottom-10 right-0 h-[380px] w-[380px] rounded-full bg-[oklch(0.78_0.12_270)] opacity-40 blur-3xl animate-blob" style={{ animationDelay: "5s" }} />
