@@ -42,15 +42,17 @@ export function Comments() {
 
   useEffect(() => {
     load();
+    // Unique channel name per mount avoids "callbacks after subscribe()" when
+    // React StrictMode double-invokes effects in development.
+    const channelName = `comments-stream-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel("comments-stream")
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "comments" },
         (payload) => {
           const c = payload.new as Comment & { status?: string };
           if (c.status !== "approved") return;
-          // Only add if not already present
           newIdRef.current = c.id;
           setItems((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev]));
         },
